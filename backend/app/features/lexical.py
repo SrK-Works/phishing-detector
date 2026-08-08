@@ -43,14 +43,22 @@ _SUSPICIOUS_TLDS = {
     "click", "link", "loan", "download", "review", "country", "kim",
 }
 
-# A small, deliberately short list of high-value phishing targets. Extend
-# with care -- a long list increases false positives on unrelated domains
-# that happen to share a short common substring.
+# High-value phishing targets: brands attackers commonly impersonate
+# (banking, payments, shipping/delivery, email/social, shopping, crypto,
+# e-signature). Deliberately excludes 1-2 char names (e.g. "x") -- those sit
+# within edit-distance-2 of huge swaths of unrelated real domains.
+# `typosquat_target` below additionally guards short brand names with a
+# distance-to-length ratio so it doesn't fire on every short real domain.
 _BRAND_DOMAINS = [
     "google", "facebook", "amazon", "apple", "microsoft", "paypal",
     "netflix", "instagram", "whatsapp", "linkedin", "twitter", "chatgpt",
-    "openai", "bankofamerica", "chase", "wellsfargo", "dropbox", "github",
-    "gmail", "outlook", "icloud", "yahoo", "ebay", "steamcommunity",
+    "openai", "bankofamerica", "chase", "wellsfargo", "citibank", "hsbc",
+    "capitalone", "usbank", "dropbox", "github", "gmail", "outlook",
+    "icloud", "yahoo", "ebay", "steamcommunity", "venmo", "stripe",
+    "cashapp", "coinbase", "binance", "metamask", "docusign", "adobe",
+    "usps", "fedex", "ups", "dhl", "spotify", "tiktok", "snapchat",
+    "pinterest", "reddit", "walmart", "target", "etsy", "aliexpress",
+    "verizon", "tmobile",
 ]
 
 
@@ -118,11 +126,6 @@ def has_double_slash_redirect(url: str) -> bool:
     return "//" in url[start:]
 
 
-def has_hyphen_in_domain(url: str) -> bool:
-    parts = _extract(url)
-    return "-" in parts.domain
-
-
 def subdomain_count(url: str) -> int:
     parts = _extract(url)
     if not parts.subdomain:
@@ -172,6 +175,53 @@ def is_exact_brand_domain(url: str) -> bool:
     return parts.domain.lower() in _BRAND_DOMAINS
 
 
+def typosquat_target(url: str) -> str | None:
+    """Which brand this domain looks like a lookalike of, for UI display
+    (e.g. "You entered X -- this looks like a lookalike of Y"). Distinct
+    from `brand_typosquat_distance` (a raw number the model consumes).
+    Catches two distinct patterns, both requiring the domain not be the
+    real brand domain itself:
+
+    1. Spelling-close lookalikes ("paypa1.com") -- close in absolute edit
+       distance AND close relative to the name's length, so a short real
+       domain like "app.com" doesn't get flagged just for sharing a short
+       prefix with "apple".
+    2. Brand-name stuffing ("paypal-secure-login.com") -- a known brand
+       name appearing as a whole hyphen/underscore-separated word
+       alongside other words. This used to be caught only loosely, if at
+       all, by a blanket "has a hyphen in the domain" feature -- which
+       produces far more false positives today than it used to (hyphens
+       are common in ordinary product names now) than true positives, so
+       it was dropped in favor of this more precise, brand-specific check.
+       Whole-word matching (not a raw substring check) matters here: it
+       avoids flagging something like "target-market.com" for containing
+       "target" *inside* an unrelated compound... except when "target"
+       itself is the whole word, which is exactly the risk with brand
+       names that are also common English words -- a known, accepted
+       trade-off, same as with any short/common brand name in this list.
+    """
+    parts = _extract(url)
+    name = parts.domain.lower()
+    if not name or name in _BRAND_DOMAINS:
+        return None
+
+    words = re.split(r"[-_]", name)
+    if len(words) > 1:
+        for brand in _BRAND_DOMAINS:
+            if brand in words:
+                return brand
+
+    brand, distance = min(
+        ((b, _levenshtein(name, b)) for b in _BRAND_DOMAINS), key=lambda kv: kv[1]
+    )
+    if distance == 0:
+        return None
+    longest = max(len(name), len(brand))
+    if distance <= 2 and distance / longest <= 0.25:
+        return brand
+    return None
+
+
 @dataclass(frozen=True)
 class LexicalFeatures:
     url_length: int
@@ -179,7 +229,6 @@ class LexicalFeatures:
     uses_url_shortener: bool
     has_at_symbol: bool
     has_double_slash_redirect: bool
-    has_hyphen_in_domain: bool
     subdomain_count: int
     uses_https: bool
     digit_ratio_in_domain: float
@@ -199,7 +248,6 @@ def extract_lexical_features(url: str) -> LexicalFeatures:
         uses_url_shortener=uses_url_shortener(url),
         has_at_symbol=has_at_symbol(url),
         has_double_slash_redirect=has_double_slash_redirect(url),
-        has_hyphen_in_domain=has_hyphen_in_domain(url),
         subdomain_count=subdomain_count(url),
         uses_https=uses_https(url),
         digit_ratio_in_domain=digit_ratio_in_domain(url),

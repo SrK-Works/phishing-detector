@@ -44,6 +44,28 @@ OPENPHISH_URL = "https://openphish.com/feed.txt"
 
 _HTTP_TIMEOUT = 30
 
+# Real phishing feeds are full URLs -- typically a path/query string from an
+# actual attack kit -- while Tranco and hand-built brand URLs are bare
+# domains. Without mixing realistic paths into the legit side too, every
+# legit training example ends up much shorter than every phishing example,
+# and the model learns "long URL -> phishing" as a shortcut that has
+# nothing to do with legitimacy: it then misfires on completely ordinary
+# real-world URLs like "accounts.google.com/signin". A meaningful fraction
+# stays path-less (bare domain visits are common too), the rest get a
+# realistic-looking path so the length distributions actually overlap.
+_LEGIT_PATH_SAMPLES = [
+    "", "", "/", "/login", "/signin", "/account", "/settings",
+    "/help", "/about", "/contact", "/support", "/search?q=example+query",
+    "/products/12345", "/blog/2024/03/example-article-title",
+    "/en-us/docs/getting-started", "/user/profile/settings/security",
+    "/checkout/cart?items=3&promo=SAVE10", "/watch?v=dQw4w9WgXcQ",
+    "/store/apps/details?id=com.example.app", "/news/world/2024/example-headline",
+]
+
+
+def _with_random_path(url: str) -> str:
+    return url + random.choice(_LEGIT_PATH_SAMPLES)
+
 
 def fetch_tranco_domains(sample_size: int, pool_size: int = 50_000) -> list[str]:
     logger.info("Downloading Tranco top list...")
@@ -126,6 +148,7 @@ def build_dataset(
 ) -> pd.DataFrame:
     brand_urls = real_brand_urls()
     legit_urls = brand_urls + fetch_tranco_domains(max(0, legit_count - len(brand_urls)))
+    legit_urls = [_with_random_path(u) for u in legit_urls]
 
     phish_urls = fetch_phishtank_urls(phish_count // 2)
     phish_urls += fetch_openphish_urls(phish_count - len(phish_urls))

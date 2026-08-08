@@ -18,12 +18,18 @@ from app.config import settings
 
 LEGIT_LABEL = 1
 
+# A verdict computed from a probability this close to the 0.5 boundary is
+# barely more informed than a coin flip -- worth flagging explicitly rather
+# than presenting it with the same visual confidence as a 95% call.
+LOW_CONFIDENCE_BAND = 0.15
+
 
 @dataclass(frozen=True)
 class Prediction:
     verdict: str  # "safe" | "phishing"
     confidence: float  # probability of the predicted verdict, 0-1
     legit_probability: float
+    low_confidence: bool  # probability landed close to the 0.5 boundary
     top_reasons: list[tuple[str, float]]  # (feature_name, signed SHAP value), by |impact|
 
 
@@ -94,5 +100,6 @@ class PhishingModel:
             verdict=verdict,
             confidence=confidence,
             legit_probability=legit_probability,
+            low_confidence=abs(legit_probability - 0.5) < LOW_CONFIDENCE_BAND,
             top_reasons=self._explain(row, top_n),
         )

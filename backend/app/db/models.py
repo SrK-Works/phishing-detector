@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, Float, String, Text
+from sqlalchemy import Boolean, DateTime, Float, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -27,6 +27,9 @@ class CheckHistory(Base):
     url: Mapped[str] = mapped_column(Text)
     verdict: Mapped[str] = mapped_column(String(16))  # "safe" | "phishing"
     confidence: Mapped[float] = mapped_column(Float)
+    low_confidence: Mapped[bool] = mapped_column(Boolean, default=False)
+    missing_signals: Mapped[str] = mapped_column(String(128), default="")  # comma-separated
+    override_reason: Mapped[str | None] = mapped_column(String(32), default=None)
     model_version: Mapped[str] = mapped_column(String(32))
     checked_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)

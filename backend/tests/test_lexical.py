@@ -5,12 +5,12 @@ from app.features.lexical import (
     extract_lexical_features,
     has_at_symbol,
     has_double_slash_redirect,
-    has_hyphen_in_domain,
     has_ip_address,
     has_suspicious_tld,
     is_exact_brand_domain,
     registered_domain,
     subdomain_count,
+    typosquat_target,
     url_length,
     uses_https,
     uses_url_shortener,
@@ -47,11 +47,6 @@ def test_has_at_symbol():
 def test_has_double_slash_redirect():
     assert has_double_slash_redirect("https://example.com//https://evil.com") is True
     assert has_double_slash_redirect("https://example.com/path/to/page") is False
-
-
-def test_has_hyphen_in_domain():
-    assert has_hyphen_in_domain("https://paypal-secure-login.com/") is True
-    assert has_hyphen_in_domain("https://paypal.com/") is False
 
 
 def test_subdomain_count():
@@ -94,10 +89,38 @@ def test_is_exact_brand_domain():
     assert is_exact_brand_domain("https://paypa1.com/login") is False
 
 
+def test_typosquat_target_flags_close_lookalike():
+    assert typosquat_target("https://paypa1.com/login") == "paypal"
+
+
+def test_typosquat_target_none_for_real_brand():
+    assert typosquat_target("https://paypal.com/login") is None
+
+
+def test_typosquat_target_none_for_unrelated_domain():
+    assert typosquat_target("https://some-random-blog-site.com/") is None
+
+
+def test_typosquat_target_ignores_short_domain_false_positive():
+    # "app.com" is a real, unrelated domain; it shouldn't be flagged as a
+    # lookalike of "apple" just because it's a short edit distance away.
+    assert typosquat_target("https://app.com/") is None
+
+
+def test_typosquat_target_flags_brand_name_stuffing():
+    # A classic pattern the old has_hyphen_in_domain feature was meant to
+    # catch, imprecisely -- this replaces it with a brand-specific check.
+    assert typosquat_target("https://paypal-secure-login.com/") == "paypal"
+    assert typosquat_target("https://amazon-account-verify.net/") == "amazon"
+
+
+def test_typosquat_target_does_not_flag_unrelated_hyphenated_domain():
+    assert typosquat_target("https://my-startup-name.com/") is None
+
+
 def test_extract_lexical_features_returns_all_fields():
     feats = extract_lexical_features("https://login.paypa1-secure.tk/verify@evil.com")
     d = feats.as_dict()
     assert d["has_at_symbol"] is True
-    assert d["has_hyphen_in_domain"] is True
     assert d["has_suspicious_tld"] is True
     assert isinstance(d["url_length"], int)

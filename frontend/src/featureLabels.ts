@@ -5,7 +5,6 @@ const LABELS: Record<string, string> = {
   lexical_uses_url_shortener: "URL uses a link-shortening service",
   lexical_has_at_symbol: "URL contains an '@' symbol",
   lexical_has_double_slash_redirect: "URL hides a redirect with '//'",
-  lexical_has_hyphen_in_domain: "Domain name contains a hyphen",
   lexical_subdomain_count: "Number of subdomains",
   lexical_uses_https: "Uses HTTPS",
   lexical_domain_entropy: "Domain name looks randomly generated",

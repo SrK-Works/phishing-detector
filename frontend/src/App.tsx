@@ -21,8 +21,26 @@ async function fetchStats(): Promise<StatsResponse> {
   return res.json();
 }
 
-function VerdictBadge({ verdict }: { verdict: CheckResponse["verdict"] }) {
+const MISSING_SIGNAL_LABELS: Record<string, string> = {
+  domain_age: "domain age",
+  page_content: "page content",
+};
+
+function VerdictBadge({
+  verdict,
+  lowConfidence,
+}: {
+  verdict: CheckResponse["verdict"];
+  lowConfidence: boolean;
+}) {
   const isSafe = verdict === "safe";
+  if (lowConfidence) {
+    return (
+      <span className="inline-flex items-center rounded-full px-4 py-1.5 text-sm font-semibold bg-amber-500/15 text-amber-400">
+        Uncertain
+      </span>
+    );
+  }
   return (
     <span
       className={`inline-flex items-center rounded-full px-4 py-1.5 text-sm font-semibold ${
@@ -117,11 +135,48 @@ export default function App() {
 
         {result && (
           <div className="mt-6 rounded-xl border border-gray-700 bg-gray-800/50 p-5">
+            {result.typosquat_target && (
+              <div className="mb-4 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+                As per the URL you entered, you might be looking for{" "}
+                <strong>{result.typosquat_target}.com</strong> -- but this domain is a
+                close lookalike, not the real thing.
+              </div>
+            )}
+            {result.override_reason === "confirmed_threat" && (
+              <div className="mb-4 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+                Confirmed malicious by Google Safe Browsing's threat list.
+              </div>
+            )}
+            {result.override_reason === "popular_domain" && (
+              <div className="mb-4 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
+                This domain ranks #{result.popularity_rank?.toLocaleString()} among the
+                world's most-visited sites, which outweighs an otherwise shaky
+                signal from our own checks.
+              </div>
+            )}
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <span className="text-sm text-gray-400 break-all">{result.url}</span>
-              <VerdictBadge verdict={result.verdict} />
+              <VerdictBadge verdict={result.verdict} lowConfidence={result.low_confidence} />
             </div>
             <ConfidenceBar confidence={result.confidence} />
+
+            {result.low_confidence && (
+              <p className="mt-3 text-xs text-amber-400">
+                This came out close to a coin flip
+                {result.missing_signals.length > 0 && (
+                  <>
+                    {" "}
+                    because we couldn't verify{" "}
+                    {result.missing_signals
+                      .map((s) => MISSING_SIGNAL_LABELS[s] ?? s)
+                      .join(" or ")}
+                    {" "}
+                    (e.g. the site blocked automated checks, or a lookup timed out)
+                  </>
+                )}
+                {" "}-- treat the "{result.verdict === "safe" ? "looks legitimate" : "likely phishing"}" call with caution.
+              </p>
+            )}
 
             {result.reasons.length > 0 && (
               <div className="mt-5">

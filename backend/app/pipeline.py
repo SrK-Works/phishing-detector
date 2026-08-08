@@ -26,11 +26,26 @@ class ExtractedFeatures:
     content: ContentFeatures | None
     partial: bool  # True if host and/or content didn't finish in time
 
+    @property
+    def whois_missing(self) -> bool:
+        """True when we have no domain-age signal at all -- either the host
+        step never finished or its WHOIS lookup itself timed out/failed.
+        Kept separate from `domain_age_days is None` so the model (and the
+        API) can tell "genuinely missing data" apart from a value that was
+        median-imputed to look like a plausible age.
+        """
+        return self.host is None or self.host.domain_age_days is None
+
+    @property
+    def content_unavailable(self) -> bool:
+        return self.content is None or not self.content.fetch_succeeded
+
     def as_flat_dict(self) -> dict[str, float | int | bool | None]:
         flat: dict[str, float | int | bool | None] = {}
         flat.update({f"lexical_{k}": v for k, v in self.lexical.as_dict().items()})
         if self.host is not None:
             flat.update({f"host_{k}": v for k, v in self.host.as_dict().items()})
+        flat["host_whois_missing"] = self.whois_missing
         if self.content is not None:
             flat.update({f"content_{k}": v for k, v in self.content.as_dict().items()})
         return flat
