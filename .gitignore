@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Backend data/artifacts (built, not committed as source)
+backend/phishing.db
+backend/app/model/artifacts/*.joblib
+backend/app/model/artifacts/*.json
+backend/app/data/*.parquet
+backend/app/data/tranco.csv
+backend/app/data/*.zip
+
+# Node / frontend
+frontend/node_modules/
+frontend/dist/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

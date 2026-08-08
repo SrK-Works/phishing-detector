@@ -1,0 +1,17 @@
+# Local/prod-like single-container run. Build context is the repo root
+# because the Dockerfile copies from both backend/ and frontend/.
+#   docker compose up --build
+services:
+  app:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - PHISH_DATABASE_URL=sqlite:////data/phishing.db
+    volumes:
+      - phishing-data:/data
+
+volumes:
+  phishing-data:
