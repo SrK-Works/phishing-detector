@@ -1,8 +1,12 @@
 """Combines the ML model's statistical verdict with independent,
 rule-based overrides that outrank it, highest authority first:
 
-1. Google Safe Browsing confirmed match -- ground truth, not a guess, so
-   it wins regardless of what the model or popularity say.
+1. Google Safe Browsing confirmed match, OR VirusTotal reporting at least
+   `virustotal_malicious_threshold` security vendors flagging the URL --
+   ground truth, not a guess, so either one wins regardless of what the
+   model or popularity say. Requiring multiple VirusTotal engines to agree
+   (rather than treating any single flag as confirmation) filters out the
+   single-overzealous-heuristic noise that's common in VT's ecosystem.
 2. A close lookalike of a known brand domain (app.features.lexical's
    typosquat check) -- deliberately conservative (ratio-gated, exact
    brand matches excluded), so when it does fire it's a strong enough
@@ -18,7 +22,25 @@ rule-based overrides that outrank it, highest authority first:
    rarely conflicts with rule 2 in practice -- but rule 2 still takes
    priority since a compromised/newly-popular lookalike is exactly the
    case worth erring cautious on.
-4. No track record at all (no WHOIS creation date AND not in Tranco) --
+4. DNS doesn't resolve at all -- forces "uncertain" regardless of which
+   way the model leans, because there is no live site to have verified
+   anything about. This is a stronger, bidirectional version of rule 6
+   below: a track-record-less domain that *does* resolve could still be a
+   genuine same-day launch with a real, inspectable site; a domain that
+   doesn't resolve at all has zero verifiable presence -- calling it
+   confidently "safe" is just as unsupportable as calling it confidently
+   "phishing" (caught live: a nonexistent domain scored 87% "safe" from
+   the model alone, purely because training data rarely includes examples
+   of either class that fail to resolve -- see DATASET.md bug #8).
+5. Tranco popularity -- a domain among the world's most-visited sites is
+   strong evidence of legitimacy that doesn't depend on our own
+   WHOIS/content signals (which can fail or get blocked by the site
+   itself), so it can override a shaky/borderline model call. A real
+   typosquat domain is essentially never itself globally popular, so this
+   rarely conflicts with rule 2 in practice -- but rule 2 still takes
+   priority since a compromised/newly-popular lookalike is exactly the
+   case worth erring cautious on.
+6. No track record at all (no WHOIS creation date AND not in Tranco) --
    softens a confident *phishing* call to "uncertain" rather than letting
    it stand. A brand-new domain looks statistically similar whether it's a
    genuine same-day launch (a new indie app, often hosted on a shared
@@ -34,7 +56,7 @@ rule-based overrides that outrank it, highest authority first:
    track-record-less domain the model already calls "safe" -- there's no
    equivalent reason to manufacture doubt about a call that isn't a false
    alarm.
-5. Otherwise, the model's own verdict/confidence stands, including its
+7. Otherwise, the model's own verdict/confidence stands, including its
    "uncertain" (low_confidence) framing when the underlying signal is
    thin.
 
@@ -50,7 +72,8 @@ from dataclasses import dataclass
 from app.config import settings
 from app.model.predict import Prediction
 
-# None | "confirmed_threat" | "typosquat_lookalike" | "popular_domain" | "no_track_record"
+# None | "confirmed_threat" | "virustotal_flagged" | "typosquat_lookalike"
+# | "domain_unreachable" | "popular_domain" | "no_track_record"
 OverrideReason = str
 
 
@@ -67,8 +90,10 @@ def resolve_verdict(
     *,
     popularity_rank: int | None,
     confirmed_threat: bool | None,
+    virustotal_malicious_count: int | None,
     typosquat_target: str | None,
     whois_missing: bool,
+    dns_resolves: bool | None,
 ) -> Verdict:
     if confirmed_threat:
         return Verdict(
@@ -76,10 +101,31 @@ def resolve_verdict(
             override_reason="confirmed_threat",
         )
 
+    if (
+        virustotal_malicious_count is not None
+        and virustotal_malicious_count >= settings.virustotal_malicious_threshold
+    ):
+        return Verdict(
+            verdict="phishing", confidence=0.99, low_confidence=False,
+            override_reason="virustotal_flagged",
+        )
+
     if typosquat_target:
         return Verdict(
             verdict="phishing", confidence=0.9, low_confidence=False,
             override_reason="typosquat_lookalike",
+        )
+
+    # dns_resolves is False (not just falsy/None) -- None means the host
+    # check itself didn't complete in time, which is a different, weaker
+    # kind of "we don't know" already handled by whois_missing/rule 6
+    # below, not a confirmed absence of any live site.
+    if dns_resolves is False:
+        return Verdict(
+            verdict=prediction.verdict,
+            confidence=prediction.confidence,
+            low_confidence=True,
+            override_reason="domain_unreachable",
         )
 
     if popularity_rank is not None and popularity_rank <= settings.popularity_override_rank:

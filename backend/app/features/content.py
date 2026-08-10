@@ -6,7 +6,7 @@ SSRF-checked first.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, fields
+from dataclasses import dataclass
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
@@ -46,9 +46,25 @@ class ContentFeatures:
     has_iframe: bool | None
     has_mailto_form: bool | None
     external_resource_ratio: float | None
+    # Raw page metadata, kept for the AI-generated site-description feature
+    # only. Deliberately excluded from as_dict() below: that method feeds
+    # app.pipeline's flat feature dict, which build_dataset.py writes
+    # straight to the training parquet, and free text would poison the ML
+    # feature set (coerced to an all-NaN column at training time). Text like
+    # this belongs nowhere near model training anyway -- it's page-supplied
+    # and untrusted, unlike our extracted numeric/boolean signals.
+    page_title: str | None = None
+    meta_description: str | None = None
 
     def as_dict(self) -> dict[str, float | int | bool | None]:
-        return {f.name: getattr(self, f.name) for f in fields(self)}
+        return {
+            "fetch_succeeded": self.fetch_succeeded,
+            "redirect_count": self.redirect_count,
+            "external_anchor_ratio": self.external_anchor_ratio,
+            "has_iframe": self.has_iframe,
+            "has_mailto_form": self.has_mailto_form,
+            "external_resource_ratio": self.external_resource_ratio,
+        }
 
 
 _EMPTY = ContentFeatures(
@@ -58,6 +74,8 @@ _EMPTY = ContentFeatures(
     has_iframe=None,
     has_mailto_form=None,
     external_resource_ratio=None,
+    page_title=None,
+    meta_description=None,
 )
 
 
@@ -86,6 +104,21 @@ def _has_mailto_form(soup: BeautifulSoup) -> bool:
         if "mailto:" in action.lower():
             return True
     return False
+
+
+def _page_title(soup: BeautifulSoup) -> str | None:
+    tag = soup.find("title")
+    if tag and tag.string and tag.string.strip():
+        return tag.string.strip()[:200]
+    return None
+
+
+def _meta_description(soup: BeautifulSoup) -> str | None:
+    tag = soup.find("meta", attrs={"name": "description"})
+    content = tag.get("content") if tag else None
+    if content and content.strip():
+        return content.strip()[:300]
+    return None
 
 
 def _external_resource_ratio(soup: BeautifulSoup, base_domain: str, page_url: str) -> float:
@@ -122,6 +155,8 @@ def extract_content_features(
             has_iframe=None,
             has_mailto_form=None,
             external_resource_ratio=None,
+            page_title=None,
+            meta_description=None,
         )
 
     base_domain = registered_domain(result.final_url)
@@ -133,4 +168,6 @@ def extract_content_features(
         has_iframe=_has_iframe(soup),
         has_mailto_form=_has_mailto_form(soup),
         external_resource_ratio=_external_resource_ratio(soup, base_domain, result.final_url),
+        page_title=_page_title(soup),
+        meta_description=_meta_description(soup),
     )

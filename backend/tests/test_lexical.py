@@ -90,7 +90,10 @@ def test_is_exact_brand_domain():
 
 
 def test_typosquat_target_flags_close_lookalike():
-    assert typosquat_target("https://paypa1.com/login") == "paypal"
+    match = typosquat_target("https://paypa1.com/login")
+    assert match.brand == "paypal"
+    assert match.real_domain == "paypal.com"
+    assert match.diff_description == 'the letter "1" was swapped for "l"'
 
 
 def test_typosquat_target_none_for_real_brand():
@@ -110,12 +113,51 @@ def test_typosquat_target_ignores_short_domain_false_positive():
 def test_typosquat_target_flags_brand_name_stuffing():
     # A classic pattern the old has_hyphen_in_domain feature was meant to
     # catch, imprecisely -- this replaces it with a brand-specific check.
-    assert typosquat_target("https://paypal-secure-login.com/") == "paypal"
-    assert typosquat_target("https://amazon-account-verify.net/") == "amazon"
+    match = typosquat_target("https://paypal-secure-login.com/")
+    assert match.brand == "paypal"
+    assert match.diff_description is None  # no single "letter swap" for this pattern
+    assert typosquat_target("https://amazon-account-verify.net/").brand == "amazon"
 
 
 def test_typosquat_target_does_not_flag_unrelated_hyphenated_domain():
     assert typosquat_target("https://my-startup-name.com/") is None
+
+
+def test_typosquat_target_ignores_short_name_even_at_edit_distance_one():
+    # "ets" (ets.org, the real Educational Testing Service / GRE site) is
+    # edit-distance 1 from "etsy" -- exactly at the old ratio cutoff
+    # (1/4 == 0.25) -- so it used to be flagged as a lookalike despite being
+    # a genuine, well-established, unrelated domain.
+    assert typosquat_target("https://ets.org/") is None
+
+
+def test_typosquat_target_flags_indian_bank_lookalike():
+    # "hdtc" instead of "hdfc" -- exactly the real-world case that prompted
+    # this: a single misplaced letter in a bank name is the classic
+    # phishing pattern a user is likely to overlook at a glance.
+    match = typosquat_target("https://hdtc.com/")
+    assert match.brand == "hdfc"
+    assert match.real_domain == "hdfcbank.com"
+    assert match.diff_description == 'the letter "t" was swapped for "f"'
+
+
+def test_typosquat_target_does_not_flag_real_brand_domain_with_different_slug():
+    # "hdfc" (the typosquat slug) and "hdfcbank" (the real domain's own
+    # name) are deliberately different strings -- the real site itself
+    # must never be flagged as a lookalike of its own brand slug.
+    assert typosquat_target("https://hdfcbank.com/") is None
+    assert is_exact_brand_domain("https://hdfcbank.com/") is True
+
+
+def test_bank_in_subdomains_are_treated_as_distinct_registrable_domains():
+    # The bug this guards against: yonosbi.bank.in doesn't resolve to
+    # anything real, but bank.in itself is a popular, Tranco-ranked domain
+    # (real banks use it) -- without extra_suffixes, both are misparsed as
+    # the single shared entity "bank.in", handing a fake subdomain the
+    # real one's popularity.
+    assert registered_domain("https://yonosbi.bank.in") == "yonosbi.bank.in"
+    assert registered_domain("https://au.bank.in") == "au.bank.in"
+    assert registered_domain("https://sbi.fin.in") == "sbi.fin.in"
 
 
 def test_extract_lexical_features_returns_all_fields():

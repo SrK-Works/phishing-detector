@@ -120,7 +120,37 @@ outside the synthetic dataset.
    Confirmed fix: `accounts.google.com/signin` now scores 79.7% legit from
    the raw model alone, no override needed.
 
+8. **`registered_domain()` misparsed India's `.bank.in`/`.fin.in` as a
+   single shared entity, letting a completely fake subdomain inherit a
+   real bank's popularity.** These are RBI/NIXI-launched multi-tenant
+   namespaces (banks/NBFCs each register directly under them, e.g.
+   `au.bank.in`) -- the same shape as `github.io`, but not yet tracked by
+   the bundled Public Suffix List snapshot at all (not even in its
+   "private" section, unlike bug #4's fix). Without knowing this,
+   `yonosbi.bank.in` -- a domain that doesn't even resolve -- parsed as
+   domain=`bank`, suffix=`in`, making its "registrable domain" the shared
+   `bank.in`, which is itself real, popular, and Tranco-ranked (#6,369).
+   The popularity override then confidently called a non-existent domain
+   "safe". Found via a user testing a real-world lookalike URL, not
+   synthetic data. Fixed with `extra_suffixes=["bank.in", "fin.in"]` on
+   the shared `tldextract` instance -- the direct extension of bug #4's
+   fix to a namespace PSL itself doesn't cover.
+
 ## Known limitations (not yet fixed)
+
+- **A domain that fails to resolve at all can still score confidently
+  "safe" from the raw model.** `yonosbi.bank.in` (bug #8 above) has
+  `host_dns_resolves=False` -- there is no live site, at all -- yet the
+  calibrated model alone still put it at ~87% legit. Training data is the
+  likely cause: legit rows (from Tranco) are by definition live sites, and
+  phishing-feed rows are typically captured while still active, so the
+  model has seen very few real examples of "this domain doesn't resolve"
+  in either class and has little learned signal for it. A domain that
+  can't be reached can't be verified as legitimate by any means, so this
+  arguably deserves its own rule-based override (independent of
+  popularity/WHOIS) rather than being left to the ML model's guess --
+  flagged here rather than fixed, since it's a distinct question from the
+  bank.in bug that surfaced it.
 
 - **Synthetic paths are a stand-in for real deep links.** Bug #6's fix
   reduces the length-based bias but the paths are drawn from a fixed
@@ -146,4 +176,8 @@ outside the synthetic dataset.
 - **Dataset is small (600 rows).** Solid enough to validate the pipeline
   end-to-end and catch the bugs above, but not enough for a defensible
   accuracy claim. Scaling up needs either paid feed access or accumulating
-  daily snapshots over time.
+  daily snapshots over time. `app/model/train.py`'s cross-validated model
+  selection (see ARCHITECTURE.md's "Data & training" section) exists
+  specifically because a single train/test split on this little data is
+  too noisy to trust on its own -- CV doesn't fix a small dataset, it just
+  stops the model-selection step from lying about how sure it is.

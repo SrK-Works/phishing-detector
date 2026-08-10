@@ -1,4 +1,6 @@
-from app.features.content import _is_external
+from bs4 import BeautifulSoup
+
+from app.features.content import _is_external, _meta_description, _page_title
 
 
 def test_same_domain_is_not_external():
@@ -21,3 +23,25 @@ def test_known_infra_domain_is_not_external():
 
 def test_empty_domain_is_not_external():
     assert _is_external("google.com", "") is False
+
+
+def test_page_title_extracts_text():
+    soup = BeautifulSoup("<html><head><title>  Example Site  </title></head></html>", "lxml")
+    assert _page_title(soup) == "Example Site"
+
+
+def test_page_title_none_when_missing():
+    soup = BeautifulSoup("<html><head></head></html>", "lxml")
+    assert _page_title(soup) is None
+
+
+def test_meta_description_extracts_content():
+    soup = BeautifulSoup(
+        '<html><head><meta name="description" content="A great site."></head></html>', "lxml"
+    )
+    assert _meta_description(soup) == "A great site."
+
+
+def test_meta_description_none_when_missing():
+    soup = BeautifulSoup("<html><head></head></html>", "lxml")
+    assert _meta_description(soup) is None

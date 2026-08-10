@@ -37,10 +37,21 @@ class PhishingModel:
     def __init__(self, artifact_path: Path | None = None):
         artifact_path = artifact_path or settings.model_artifact_path
         bundle = joblib.load(artifact_path)
+        # Two related but distinct fitted objects, both produced by
+        # app.model.train from the *same* hyperparameters:
+        # - `pipeline`: the plain, uncalibrated estimator -- used only for
+        #   SHAP explanations, since SHAP needs direct access to a single
+        #   model's raw decision function, not an averaged ensemble.
+        # - `calibrator`: a CalibratedClassifierCV wrapping that same
+        #   pipeline family -- used for the actual predict_proba() a
+        #   verdict/confidence is built from, so a shown "90% confidence"
+        #   is empirically closer to meaning what it says (see train.py's
+        #   docstring for why calibration was added).
         self.pipeline: Pipeline = bundle["pipeline"]
+        self.calibrator = bundle["calibrator"]
         self.feature_names: list[str] = bundle["feature_names"]
         self.background_sample: pd.DataFrame = bundle["background_sample"]
-        self._legit_index = list(self.pipeline.classes_).index(LEGIT_LABEL)
+        self._legit_index = list(self.calibrator.classes_).index(LEGIT_LABEL)
         self._explainer = None
 
     def _row_from_features(self, flat_features: dict) -> pd.DataFrame:
@@ -91,7 +102,7 @@ class PhishingModel:
 
     def predict(self, flat_features: dict, top_n: int = 5) -> Prediction:
         row = self._row_from_features(flat_features)
-        proba = self.pipeline.predict_proba(row)[0]
+        proba = self.calibrator.predict_proba(row)[0]
         legit_probability = float(proba[self._legit_index])
         verdict = "safe" if legit_probability >= 0.5 else "phishing"
         confidence = legit_probability if verdict == "safe" else 1.0 - legit_probability

@@ -128,18 +128,24 @@ def real_brand_urls() -> list[str]:
     """Apex + www URLs for the actual brand domains used by
     app.features.lexical's typosquat-distance check.
 
-    A random Tranco sample almost never lands on one of these ~24 specific
+    A random Tranco sample almost never lands on one of these specific
     domains, so without forcing them in, the model would never see a
     legit example with brand_typosquat_distance == 0 / is_exact_brand_domain
     == True during training -- only phishing examples that impersonate a
     brand at a small nonzero distance. It would then generalize "close to a
     known brand name" as a phishing signal with no exception carved out for
     the real thing, misflagging the actual brand sites.
+
+    Uses each brand's mapped *real* domain (dict values), not
+    f"{brand}.com" -- that assumption is wrong for a growing share of the
+    list (e.g. "metamask" -> metamask.io, "hdfc" -> hdfcbank.com), and
+    training on the wrong domain would teach the model to recognize a URL
+    that isn't actually the real brand site.
     """
     urls = []
-    for brand in _BRAND_DOMAINS:
-        urls.append(f"https://{brand}.com")
-        urls.append(f"https://www.{brand}.com")
+    for real_domain in _BRAND_DOMAINS.values():
+        urls.append(f"https://{real_domain}")
+        urls.append(f"https://www.{real_domain}")
     return urls
 
 

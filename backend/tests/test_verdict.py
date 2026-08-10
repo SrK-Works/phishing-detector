@@ -18,8 +18,10 @@ def test_confirmed_threat_overrides_everything():
         prediction,
         popularity_rank=1,
         confirmed_threat=True,
+        virustotal_malicious_count=None,
         typosquat_target=None,
         whois_missing=False,
+        dns_resolves=True,
     )
     assert resolved.verdict == "phishing"
     assert resolved.override_reason == "confirmed_threat"
@@ -31,8 +33,10 @@ def test_popular_domain_overrides_shaky_phishing_call():
         prediction,
         popularity_rank=9790,
         confirmed_threat=None,
+        virustotal_malicious_count=None,
         typosquat_target=None,
         whois_missing=False,
+        dns_resolves=True,
     )
     assert resolved.verdict == "safe"
     assert resolved.low_confidence is False
@@ -45,8 +49,10 @@ def test_unranked_domain_with_track_record_falls_back_to_model():
         prediction,
         popularity_rank=None,
         confirmed_threat=None,
+        virustotal_malicious_count=None,
         typosquat_target=None,
         whois_missing=False,
+        dns_resolves=True,
     )
     assert resolved.verdict == "phishing"
     assert resolved.override_reason is None
@@ -58,8 +64,10 @@ def test_popularity_rank_outside_threshold_does_not_override():
         prediction,
         popularity_rank=900_000,
         confirmed_threat=None,
+        virustotal_malicious_count=None,
         typosquat_target=None,
         whois_missing=False,
+        dns_resolves=True,
     )
     assert resolved.override_reason is None
 
@@ -70,11 +78,72 @@ def test_confirmed_threat_beats_popularity():
         prediction,
         popularity_rank=1,
         confirmed_threat=True,
+        virustotal_malicious_count=None,
         typosquat_target=None,
         whois_missing=False,
+        dns_resolves=True,
     )
     assert resolved.verdict == "phishing"
     assert resolved.override_reason == "confirmed_threat"
+
+
+def test_virustotal_consensus_overrides_shaky_safe_call():
+    prediction = _prediction("safe", 0.9, False)
+    resolved = resolve_verdict(
+        prediction,
+        popularity_rank=None,
+        confirmed_threat=None,
+        virustotal_malicious_count=5,
+        typosquat_target=None,
+        whois_missing=False,
+        dns_resolves=True,
+    )
+    assert resolved.verdict == "phishing"
+    assert resolved.override_reason == "virustotal_flagged"
+
+
+def test_virustotal_below_threshold_does_not_override():
+    # A single flagged engine is common noise in VT's ecosystem, not
+    # reliable confirmation on its own.
+    prediction = _prediction("safe", 0.9, False)
+    resolved = resolve_verdict(
+        prediction,
+        popularity_rank=None,
+        confirmed_threat=None,
+        virustotal_malicious_count=1,
+        typosquat_target=None,
+        whois_missing=False,
+        dns_resolves=True,
+    )
+    assert resolved.override_reason is None
+
+
+def test_confirmed_threat_beats_virustotal():
+    prediction = _prediction("safe", 0.9, False)
+    resolved = resolve_verdict(
+        prediction,
+        popularity_rank=None,
+        confirmed_threat=True,
+        virustotal_malicious_count=10,
+        typosquat_target=None,
+        whois_missing=False,
+        dns_resolves=True,
+    )
+    assert resolved.override_reason == "confirmed_threat"
+
+
+def test_virustotal_beats_typosquat_and_popularity():
+    prediction = _prediction("safe", 0.9, False)
+    resolved = resolve_verdict(
+        prediction,
+        popularity_rank=1,
+        confirmed_threat=None,
+        virustotal_malicious_count=4,
+        typosquat_target="paypal",
+        whois_missing=False,
+        dns_resolves=True,
+    )
+    assert resolved.override_reason == "virustotal_flagged"
 
 
 def test_typosquat_target_overrides_shaky_safe_call():
@@ -86,8 +155,10 @@ def test_typosquat_target_overrides_shaky_safe_call():
         prediction,
         popularity_rank=None,
         confirmed_threat=None,
+        virustotal_malicious_count=None,
         typosquat_target="paypal",
         whois_missing=False,
+        dns_resolves=True,
     )
     assert resolved.verdict == "phishing"
     assert resolved.override_reason == "typosquat_lookalike"
@@ -99,8 +170,10 @@ def test_typosquat_target_beats_popularity():
         prediction,
         popularity_rank=100,
         confirmed_threat=None,
+        virustotal_malicious_count=None,
         typosquat_target="paypal",
         whois_missing=False,
+        dns_resolves=True,
     )
     assert resolved.override_reason == "typosquat_lookalike"
 
@@ -111,8 +184,10 @@ def test_confirmed_threat_beats_typosquat():
         prediction,
         popularity_rank=None,
         confirmed_threat=True,
+        virustotal_malicious_count=None,
         typosquat_target="paypal",
         whois_missing=False,
+        dns_resolves=True,
     )
     assert resolved.override_reason == "confirmed_threat"
 
@@ -128,8 +203,10 @@ def test_no_track_record_softens_confident_phishing_to_uncertain():
         prediction,
         popularity_rank=None,
         confirmed_threat=None,
+        virustotal_malicious_count=None,
         typosquat_target=None,
         whois_missing=True,
+        dns_resolves=True,
     )
     assert resolved.verdict == "phishing"
     assert resolved.confidence == 0.917
@@ -145,8 +222,10 @@ def test_no_track_record_does_not_touch_a_safe_call():
         prediction,
         popularity_rank=None,
         confirmed_threat=None,
+        virustotal_malicious_count=None,
         typosquat_target=None,
         whois_missing=True,
+        dns_resolves=True,
     )
     assert resolved.verdict == "safe"
     assert resolved.low_confidence is False
@@ -161,10 +240,97 @@ def test_track_record_present_does_not_trigger_no_track_record_rule():
         prediction,
         popularity_rank=500_000,
         confirmed_threat=None,
+        virustotal_malicious_count=None,
         typosquat_target=None,
         whois_missing=True,
+        dns_resolves=True,
     )
     assert resolved.override_reason is None
+
+
+def test_domain_unreachable_softens_confident_safe_call():
+    # This is the yonosbi.bank.in case: a domain that doesn't resolve at
+    # all scored 87% "safe" from the model alone. Bidirectional (unlike
+    # no_track_record): there's zero live site to have verified anything
+    # about, so a confident "safe" is just as unsupportable as "phishing".
+    prediction = _prediction("safe", 0.87, False)
+    resolved = resolve_verdict(
+        prediction,
+        popularity_rank=None,
+        confirmed_threat=None,
+        virustotal_malicious_count=None,
+        typosquat_target=None,
+        whois_missing=True,
+        dns_resolves=False,
+    )
+    assert resolved.verdict == "safe"
+    assert resolved.confidence == 0.87
+    assert resolved.low_confidence is True
+    assert resolved.override_reason == "domain_unreachable"
+
+
+def test_domain_unreachable_softens_confident_phishing_call_too():
+    prediction = _prediction("phishing", 0.9, False)
+    resolved = resolve_verdict(
+        prediction,
+        popularity_rank=None,
+        confirmed_threat=None,
+        virustotal_malicious_count=None,
+        typosquat_target=None,
+        whois_missing=True,
+        dns_resolves=False,
+    )
+    assert resolved.verdict == "phishing"
+    assert resolved.low_confidence is True
+    assert resolved.override_reason == "domain_unreachable"
+
+
+def test_dns_resolves_none_does_not_trigger_domain_unreachable():
+    # None means the host check itself didn't finish in time -- a
+    # different, weaker kind of "unknown" than a confirmed DNS failure,
+    # already handled by the no_track_record rule instead.
+    prediction = _prediction("phishing", 0.917, False)
+    resolved = resolve_verdict(
+        prediction,
+        popularity_rank=None,
+        confirmed_threat=None,
+        virustotal_malicious_count=None,
+        typosquat_target=None,
+        whois_missing=True,
+        dns_resolves=None,
+    )
+    assert resolved.override_reason == "no_track_record"
+
+
+def test_confirmed_threat_beats_domain_unreachable():
+    # Safe Browsing's determination doesn't depend on the domain currently
+    # resolving -- a reported phishing kit that's since been taken down is
+    # still a confirmed threat, not suddenly "uncertain".
+    prediction = _prediction("safe", 0.9, False)
+    resolved = resolve_verdict(
+        prediction,
+        popularity_rank=None,
+        confirmed_threat=True,
+        virustotal_malicious_count=None,
+        typosquat_target=None,
+        whois_missing=True,
+        dns_resolves=False,
+    )
+    assert resolved.override_reason == "confirmed_threat"
+
+
+def test_typosquat_beats_domain_unreachable():
+    prediction = _prediction("safe", 0.9, False)
+    resolved = resolve_verdict(
+        prediction,
+        popularity_rank=None,
+        confirmed_threat=None,
+        virustotal_malicious_count=None,
+        typosquat_target="paypal",
+        whois_missing=True,
+        dns_resolves=False,
+    )
+    assert resolved.override_reason == "typosquat_lookalike"
 
 
 def test_typosquat_beats_no_track_record():
@@ -175,8 +341,10 @@ def test_typosquat_beats_no_track_record():
         prediction,
         popularity_rank=None,
         confirmed_threat=None,
+        virustotal_malicious_count=None,
         typosquat_target="paypal",
         whois_missing=True,
+        dns_resolves=True,
     )
     assert resolved.verdict == "phishing"
     assert resolved.override_reason == "typosquat_lookalike"

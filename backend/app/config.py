@@ -41,5 +41,27 @@ class Settings(BaseSettings):
     # Left unset, that check is simply skipped (feature degrades gracefully).
     safe_browsing_api_key: str | None = None
 
+    # Optional: enables a second, independent ground-truth check --
+    # VirusTotal's multi-engine (70+ security vendors) URL reputation
+    # consensus. Free tier, self-service -- get one at
+    # https://www.virustotal.com/gui/my-apikey (heavily rate-limited on the
+    # free tier: 4 requests/minute, 500/day -- fine for personal use, not
+    # for real production traffic). Left unset, that check is simply
+    # skipped (feature degrades gracefully).
+    virustotal_api_key: str | None = None
+    # Require multiple engines to agree before treating VirusTotal as a
+    # verdict-changing signal -- a single engine flagging a URL is common
+    # noise in VT's ecosystem (aggressive heuristics, stale signatures),
+    # not reliable enough on its own to override the rest of this pipeline.
+    virustotal_malicious_threshold: int = 3
+
+    # Optional: enables an AI-generated one-line "what is this site" summary
+    # in the UI. Purely informational -- it never feeds the verdict/ML model,
+    # only helps a user orient themselves. Free tier, self-service -- get one
+    # at https://aistudio.google.com/apikey. Left unset, the description is
+    # simply omitted (feature degrades gracefully).
+    gemini_api_key: str | None = None
+    gemini_model: str = "gemini-2.5-flash"
+
 
 settings = Settings()
