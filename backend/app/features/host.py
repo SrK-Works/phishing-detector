@@ -49,6 +49,21 @@ def _as_utc(dt: datetime) -> datetime:
     return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
 
 
+def _safe_hostname(url: str) -> str | None:
+    """`urlsplit(url).hostname`, but never raises. A malformed netloc (e.g.
+    an IPv4 address wrapped in brackets, which is only valid syntax for
+    IPv6) makes `urlsplit` itself raise `ValueError` -- caught live via a
+    pasted "user@[192.168.1.1]"-shaped email address, which crashed the
+    whole request with a 500 before this existed. Treated the same as "no
+    hostname at all" (None), consistent with every caller's existing
+    `if not hostname: return None/False` handling.
+    """
+    try:
+        return urlsplit(url).hostname
+    except ValueError:
+        return None
+
+
 @dataclass(frozen=True)
 class WhoisInfo:
     creation_date: datetime | None
@@ -56,18 +71,25 @@ class WhoisInfo:
 
 
 def dns_resolves(url: str) -> bool:
-    hostname = urlsplit(url).hostname
+    hostname = _safe_hostname(url)
     if not hostname:
         return False
     try:
         socket.getaddrinfo(hostname, None)
         return True
-    except socket.gaierror:
+    except (socket.gaierror, UnicodeError):
+        # UnicodeError: socket.getaddrinfo IDNA-encodes the hostname before
+        # resolving, and IDNA has its own constraints (each label <=63
+        # octets, never empty) -- a hostname violating those raises
+        # UnicodeError, not socket.gaierror. Caught live via an
+        # artificially long email domain label, which crashed the whole
+        # request with a 500 before this was caught here too. A hostname
+        # that can't even be encoded for DNS obviously "doesn't resolve".
         return False
 
 
 def lookup_whois(url: str, timeout: float) -> WhoisInfo | None:
-    hostname = urlsplit(url).hostname
+    hostname = _safe_hostname(url)
     if not hostname:
         return None
 
@@ -96,7 +118,7 @@ def registration_length_days(whois_info: WhoisInfo | None) -> int | None:
 
 
 def tls_cert_age_days(url: str, timeout: float) -> int | None:
-    hostname = urlsplit(url).hostname
+    hostname = _safe_hostname(url)
     if not hostname:
         return None
     try:

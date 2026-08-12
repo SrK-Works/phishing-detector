@@ -63,5 +63,34 @@ class Settings(BaseSettings):
     gemini_api_key: str | None = None
     gemini_model: str = "gemini-2.5-flash"
 
+    # Email Domain Checker: point-based scorer threshold/margin (see
+    # app/email_verdict.py). A domain scoring at or above the threshold is
+    # called "phishing"; scores within `margin` points of the threshold are
+    # flagged low_confidence -- a genuine "too close to call" band, not
+    # every scored result.
+    email_phishing_score_threshold: int = 40
+    email_low_confidence_margin: int = 15
+    # A domain younger than this contributes to the score -- new domains
+    # are disproportionately used for short-lived phishing campaigns.
+    email_min_domain_age_days: int = 30
+
+    # Phone Number Checker: default region used by phonenumbers.parse()
+    # when the entered number has no leading "+"/country code.
+    phone_default_region: str = "IN"
+
+    # Per-IP rate limit on the check endpoints (e.g. "20/minute"). These
+    # endpoints make outbound calls to third-party APIs with real free-tier
+    # quotas (VirusTotal: 4/min, 500/day) and fetch arbitrary user-submitted
+    # URLs -- without a limit, a single client can exhaust those quotas for
+    # everyone or use this server as a free "fetch any public URL" proxy.
+    check_rate_limit: str = "20/minute"
+    stats_rate_limit: str = "60/minute"
+
+    # How long a check-history row is kept before automatic deletion. People
+    # paste sensitive things into these checkers (password-reset links,
+    # phone numbers) -- there is no reason to keep that data longer than the
+    # cache/analytics purpose it serves.
+    history_retention_days: int = 30
+
 
 settings = Settings()

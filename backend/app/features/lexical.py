@@ -132,6 +132,157 @@ _BRAND_DOMAINS: dict[str, str] = {
     "meesho": "meesho.com", "bigbasket": "bigbasket.com", "nykaa": "nykaa.com",
     # Indian telecom
     "jio": "jio.com", "airtel": "airtel.in", "myvi": "myvi.in",
+
+    # IT services / consulting / BPO -- the companies most often impersonated
+    # in "you've been shortlisted, click here to submit documents" recruitment
+    # phishing, which doesn't target banks/payments at all. Verified via web
+    # search (2026-08), same discipline as the rest of this list.
+    "tcs": "tcs.com", "infosys": "infosys.com", "wipro": "wipro.com",
+    "hcltech": "hcltech.com", "techmahindra": "techmahindra.com",
+    "capgemini": "capgemini.com", "genpact": "genpact.com",
+    "concentrix": "concentrix.com", "persistent": "persistent.com",
+    "cyient": "cyient.com", "wns": "wns.com", "firstsource": "firstsource.com",
+    "teleperformance": "teleperformance.com", "mphasis": "mphasis.com",
+    "accenture": "accenture.com", "deloitte": "deloitte.com", "ey": "ey.com",
+    "kpmg": "kpmg.com", "pwc": "pwc.com", "oracle": "oracle.com", "sap": "sap.com",
+    "ibm": "ibm.com",
+    "dell": "dell.com", "cisco": "cisco.com", "intel": "intel.com",
+    "qualcomm": "qualcomm.com", "salesforce": "salesforce.com",
+    "servicenow": "servicenow.com", "vmware": "vmware.com",
+    # Cognizant was the exact gap that motivated this section:
+    # talentacquisition@cognigant.com (a "z"->"g" swap) scored "legitimate"
+    # because "cognizant" simply wasn't in this list yet to compare against.
+    "cognizant": "cognizant.com",
+    # LTIMindtree rebranded to "LTM" in 2026 (regulatory approval, new
+    # Certificate of Incorporation) -- both the old and new name are live
+    # phishing targets, so both slugs point at the current real domain.
+    "ltimindtree": "ltm.com", "ltm": "ltm.com",
+    # Job portals -- recruitment scams commonly reference or impersonate
+    # these directly, not just the employer.
+    "naukri": "naukri.com", "indeed": "indeed.com",
+
+    # Airlines -- "your booking/refund needs confirmation" is one of the
+    # most universal phishing lures there is, independent of who the
+    # target banks with or where they work. Verified via web search
+    # (2026-08).
+    "indigo": "goindigo.in", "airindia": "airindia.com", "spicejet": "spicejet.com",
+    "emirates": "emirates.com", "qatarairways": "qatarairways.com",
+    "delta": "delta.com", "united": "united.com", "americanairlines": "aa.com",
+    "lufthansa": "lufthansa.com", "britishairways": "britishairways.com",
+    # Couriers -- "your parcel couldn't be delivered, pay this fee to
+    # release it" is the courier-flavored version of the same lure, and one
+    # of the most common phishing/smishing patterns in India specifically.
+    "bluedart": "bluedart.com", "delhivery": "delhivery.com", "dtdc": "dtdc.in",
+    "indiapost": "indiapost.gov.in", "ecomexpress": "ecomexpress.in",
+    # Indian insurance -- policy renewal/lapse scams are a major, distinct
+    # phishing category in India. Two rebrand gotchas caught while verifying
+    # (2026-08): Max Life Insurance is now "Axis Max Life Insurance" at
+    # axismaxlife.com (rebranded Dec 2024, old maxlifeinsurance.com is
+    # stale), and Bajaj Allianz Life is now "Bajaj Life Insurance" at
+    # bajajlifeinsurance.com, not bajajallianz.com as the old name would
+    # suggest -- exactly the kind of wrong-guess this list's verify-first
+    # discipline exists to catch.
+    "lic": "licindia.in", "hdfclife": "hdfclife.com",
+    "iciciprulife": "iciciprulife.com", "maxlife": "axismaxlife.com",
+    "bajajallianz": "bajajlifeinsurance.com",
+    # More Indian product/tech companies -- account-security and
+    # recruitment phishing both target these directly (food delivery,
+    # ride-hailing, fintech, and ed-tech accounts all carry saved payment
+    # methods, and all of these are also major employers).
+    "zoho": "zoho.com", "freshworks": "freshworks.com", "razorpay": "razorpay.com",
+    "swiggy": "swiggy.com", "zomato": "zomato.com", "ola": "olacabs.com",
+    "cred": "cred.club", "byjus": "byjus.com", "groww": "groww.in",
+    "zerodha": "zerodha.com", "upstox": "upstox.com", "policybazaar": "policybazaar.com",
+    # More global banks
+    "standardchartered": "sc.com", "deutschebank": "db.com", "dbs": "dbs.com",
+    # Streaming
+    "hotstar": "hotstar.com",
+    # Freelance/gig platforms -- adjacent to the recruitment-scam theme
+    # this section started with (fake job offers routed through these too).
+    "upwork": "upwork.com", "fiverr": "fiverr.com",
+
+    # Round 2 general expansion (163 -> ~250), prioritizing brands with the
+    # highest real-world phishing/smishing volume: account-security lures
+    # (cloud/SaaS, crypto, banking), delivery/booking lures (travel), and
+    # subscription-renewal lures (streaming) are the biggest categories
+    # globally, on top of the recruitment/India-specific ones already
+    # covered above. Verified via web search (2026-08); a few caught
+    # mid-verification below are flagged inline the same way earlier
+    # rebrand gotchas were.
+
+    # Global tech / cloud/SaaS accounts
+    "zoom": "zoom.com", "slack": "slack.com", "atlassian": "atlassian.com",
+    "godaddy": "godaddy.com", "namecheap": "namecheap.com", "cloudflare": "cloudflare.com",
+    "discord": "discord.com", "telegram": "telegram.org", "youtube": "youtube.com",
+    "twitch": "twitch.tv", "signal": "signal.org", "tinder": "tinder.com",
+    "bumble": "bumble.com", "norton": "norton.com", "mcafee": "mcafee.com",
+    "grammarly": "grammarly.com", "canva": "canva.com", "notion": "notion.so",
+    "figma": "figma.com",
+
+    # More global banks
+    "santander": "santander.com", "bbva": "bbva.com", "revolut": "revolut.com",
+    "wise": "wise.com", "chime": "chime.com", "tdbank": "tdbank.com",
+    "pnc": "pnc.com", "truist": "truist.com",
+
+    # Crypto exchanges -- among the highest-value phishing targets there
+    # is, since a successful account-takeover here means an irreversible
+    # loss. wazirx.com is a live, current phishing target: a WazirX-hack
+    # compensation-payout phishing wave was active as of this verification.
+    "kraken": "kraken.com", "cryptocom": "crypto.com", "kucoin": "kucoin.com",
+    "gemini": "gemini.com", "bitfinex": "bitfinex.com", "wazirx": "wazirx.com",
+    "coindcx": "coindcx.com", "robinhood": "robinhood.com",
+
+    # Global retail -- "your order/delivery" and fake-storefront lures
+    "costco": "costco.com", "ikea": "ikea.com", "bestbuy": "bestbuy.com",
+    "homedepot": "homedepot.com", "lowes": "lowes.com", "nike": "nike.com",
+    "adidas": "adidas.com", "zara": "zara.com", "sephora": "sephora.com",
+    "wayfair": "wayfair.com",
+
+    # Payment/fintech
+    "klarna": "klarna.com", "afterpay": "afterpay.com",
+    "westernunion": "westernunion.com", "moneygram": "moneygram.com",
+    "zelle": "zelle.com", "square": "squareup.com",
+
+    # Streaming/subscription -- "your subscription payment failed, update
+    # your card" is one of the most common renewal-scam lures. HBO Max
+    # rebranded to plain "Max" in 2023, then rebranded BACK to "HBO Max" in
+    # July 2025 -- caught mid-verification, confirmed hbomax.com is the
+    # current live domain, not max.com.
+    "disneyplus": "disneyplus.com", "hulu": "hulu.com", "hbomax": "hbomax.com",
+    "peacock": "peacocktv.com", "paramountplus": "paramountplus.com",
+
+    # Gaming -- account-takeover phishing (stored payment methods, item/
+    # currency trading) is extremely common in this category
+    "playstation": "playstation.com", "xbox": "xbox.com", "nintendo": "nintendo.com",
+    "epicgames": "epicgames.com", "roblox": "roblox.com",
+
+    # Travel/hospitality -- fake booking confirmation/cancellation is the
+    # same lure pattern as the airlines section above, one layer up the
+    # booking chain
+    "booking": "booking.com", "airbnb": "airbnb.com", "expedia": "expedia.com",
+    "tripadvisor": "tripadvisor.com", "marriott": "marriott.com", "hilton": "hilton.com",
+    "makemytrip": "makemytrip.com", "goibibo": "goibibo.com", "ryanair": "ryanair.com",
+    "easyjet": "easyjet.com",
+
+    # More job/recruitment platforms
+    "glassdoor": "glassdoor.com", "monster": "monster.com",
+    "ziprecruiter": "ziprecruiter.com", "shine": "shine.com",
+
+    # Indian NBFC/lending -- fake loan-approval/EMI scams are a major,
+    # distinct phishing category in India
+    "bajajfinserv": "bajajfinserv.in", "muthootfinance": "muthootfinance.com",
+    # PAN card services -- a very high-value target (tax fraud, identity
+    # theft). NSDL e-Governance rebranded to "Protean eGov Technologies" --
+    # both old and new names are live phishing targets, same reasoning as
+    # the LTIMindtree/LTM entry above.
+    "nsdl": "proteantech.in", "protean": "proteantech.in",
+
+    # More Indian consumer apps
+    "urbancompany": "urbancompany.com", "lenskart": "lenskart.com",
+    "pharmeasy": "pharmeasy.in",
+
+    # More global telecom
+    "vodafone": "vodafone.com", "att": "att.com",
 }
 
 # Since a brand's slug (the typosquat target, e.g. "hdfc") and its real
@@ -139,8 +290,76 @@ _BRAND_DOMAINS: dict[str, str] = {
 # domain itself needs a separate exemption from typosquat matching -- a
 # visitor to the actual hdfcbank.com must never be told it looks like a
 # lookalike of something else. Computed once at import time, not per
-# request.
-_REAL_DOMAIN_NAMES = {_extract(f"https://{d}").domain.lower() for d in _BRAND_DOMAINS.values()}
+# request. Keeps the slug alongside (rather than just a bare set) so a
+# visitor to the real domain can also be told *whose* real domain it is
+# (see known_brand_slug/brand_display_name below) -- a plain yes/no exact-
+# match boolean isn't enough to show "this is the real domain for X".
+_DOMAIN_NAME_TO_SLUG: dict[str, str] = {
+    _extract(f"https://{d}").domain.lower(): slug for slug, d in _BRAND_DOMAINS.items()
+}
+_REAL_DOMAIN_NAMES = set(_DOMAIN_NAME_TO_SLUG)
+
+# Only entries where naively title-casing the slug wouldn't read like the
+# company's actual name (initialisms, stylized capitalization, names that
+# differ from the slug entirely) -- everything else falls back to
+# `slug.title()`, which is already correct for the large majority of
+# single-word brand names in this list (e.g. "cognizant" -> "Cognizant").
+_BRAND_DISPLAY_NAMES: dict[str, str] = {
+    "hdfc": "HDFC Bank", "icici": "ICICI Bank", "axis": "Axis Bank",
+    "sbi": "State Bank of India (SBI)", "pnb": "Punjab National Bank (PNB)",
+    "hsbc": "HSBC", "usbank": "U.S. Bank", "paypal": "PayPal",
+    "aubank": "AU Small Finance Bank", "idbibank": "IDBI Bank",
+    "indusind": "IndusInd Bank", "idfcfirst": "IDFC FIRST Bank",
+    "rblbank": "RBL Bank", "uidai": "UIDAI (Aadhaar)", "gst": "GST Portal (India)",
+    "epfindia": "EPFO (India)", "irctc": "IRCTC", "npci": "NPCI",
+    "bhimupi": "BHIM UPI", "hcltech": "HCLTech", "techmahindra": "Tech Mahindra",
+    "wns": "WNS Global Services", "ey": "EY (Ernst & Young)", "kpmg": "KPMG",
+    "pwc": "PwC", "sap": "SAP", "ibm": "IBM", "tcs": "TCS (Tata Consultancy Services)",
+    "ltimindtree": "LTM (formerly LTIMindtree)", "ltm": "LTM (formerly LTIMindtree)",
+    "vmware": "VMware", "chatgpt": "ChatGPT (OpenAI)", "openai": "OpenAI",
+    "tmobile": "T-Mobile", "myvi": "My Vi (Vodafone Idea)",
+    "indigo": "IndiGo", "airindia": "Air India", "spicejet": "SpiceJet",
+    "americanairlines": "American Airlines", "britishairways": "British Airways",
+    "qatarairways": "Qatar Airways", "united": "United Airlines",
+    "dtdc": "DTDC", "indiapost": "India Post", "ecomexpress": "Ecom Express",
+    "bluedart": "Blue Dart",
+    "lic": "LIC (Life Insurance Corporation of India)",
+    "hdfclife": "HDFC Life", "iciciprulife": "ICICI Prudential Life Insurance",
+    "maxlife": "Axis Max Life Insurance (formerly Max Life)",
+    "bajajallianz": "Bajaj Life Insurance (formerly Bajaj Allianz Life)",
+    "ola": "Ola Cabs", "cred": "CRED", "byjus": "BYJU'S",
+    "policybazaar": "PolicyBazaar",
+    "standardchartered": "Standard Chartered", "deutschebank": "Deutsche Bank",
+    "dbs": "DBS Bank", "hotstar": "Disney+ Hotstar",
+    "youtube": "YouTube", "godaddy": "GoDaddy",
+    "bbva": "BBVA", "tdbank": "TD Bank", "pnc": "PNC Bank",
+    "cryptocom": "Crypto.com", "kucoin": "KuCoin", "wazirx": "WazirX",
+    "coindcx": "CoinDCX",
+    "bestbuy": "Best Buy", "homedepot": "The Home Depot", "lowes": "Lowe's",
+    "hbomax": "HBO Max", "disneyplus": "Disney+", "paramountplus": "Paramount+",
+    "ziprecruiter": "ZipRecruiter", "easyjet": "easyJet",
+    "bajajfinserv": "Bajaj Finserv", "muthootfinance": "Muthoot Finance",
+    "nsdl": "NSDL (now Protean eGov)", "protean": "Protean eGov Technologies",
+    "urbancompany": "Urban Company", "pharmeasy": "PharmEasy", "att": "AT&T",
+}
+
+
+def brand_display_name(slug: str) -> str:
+    return _BRAND_DISPLAY_NAMES.get(slug, slug.replace("-", " ").title())
+
+
+def known_brand_slug(url: str) -> str | None:
+    """Which brand slug this URL's registrable domain exactly matches, or
+    None if it doesn't match any known brand's real domain at all.
+    Distinct from is_exact_brand_domain (bool only) -- needed to surface a
+    human-readable company name ("this is the real domain for X") rather
+    than a bare yes/no.
+    """
+    parts = _extract(url)
+    name = parts.domain.lower()
+    if name in _BRAND_DOMAINS:
+        return name
+    return _DOMAIN_NAME_TO_SLUG.get(name)
 
 # Below this length, edit-distance matching against a brand name stops being
 # a real signal: a short domain has a rapidly rising chance of landing
@@ -185,6 +404,66 @@ def registered_domain(url: str) -> str:
     if not parts.domain:
         return ""
     return f"{parts.domain}.{parts.suffix}" if parts.suffix else parts.domain
+
+
+_BARE_EMAIL_RE = re.compile(r"^[^\s@/]+@[^\s@/]+\.[^\s@/]+$")
+
+
+def looks_like_bare_email(raw: str) -> bool:
+    """True if `raw` (the raw user input, BEFORE any "https://" prefix is
+    added) is shaped like a plain email address rather than a URL -- e.g.
+    "verify@openai.com" pasted into the URL checker by mistake. Caught
+    live: "noreply@email.openai.com" silently became the URL
+    "https://noreply@email.openai.com", which parses as host
+    "email.openai.com" with userinfo "noreply" -- a real but confusing
+    result for someone who meant to check an email address, not a URL.
+
+    Deliberately narrow: only matches when the *entire* trimmed input is
+    local@domain.tld with no slashes anywhere, so a real URL that happens
+    to contain "@" (a deliberately-constructed "https://user@host.com"
+    with credentials, or a path segment like "/page@2x.jpg") is never
+    misclassified -- those always contain "://" or "/", which this pattern
+    excludes.
+    """
+    return bool(_BARE_EMAIL_RE.match(raw.strip()))
+
+
+def looks_like_url(raw: str) -> bool:
+    """True if `raw` has URL structure (a scheme or a path) rather than
+    being a bare domain or email address -- e.g. a full link pasted into
+    the Email Domain Checker. A bare domain/email never legitimately
+    contains "/" or "://".
+    """
+    value = raw.strip()
+    return "://" in value or "/" in value
+
+
+def is_checkable_web_url(url: str) -> bool:
+    """False for inputs that survive naive "prepend https://" handling but
+    aren't actually a web URL the rest of this app's pipeline can
+    meaningfully assess -- caught live via three cases that all returned a
+    fabricated-looking "safe, 83% confident" verdict instead of a clear
+    rejection:
+
+    - A non-http(s) scheme (e.g. "ftp://example.com", "file:///etc/passwd")
+      -- this app only knows how to assess web pages, not other protocols.
+    - "javascript:alert(1)" -- has no "://" at all, so the caller's own
+      "prepend https://" step turns it into "https://javascript:alert(1)",
+      which *parses* (host "javascript", "alert(1)" mistaken for a port)
+      without ever being a real address.
+    - "data:text/html,..." -- same shape of problem as the above.
+
+    Must be called on the URL *after* any https:// prefixing the caller
+    already applied, so both "explicit bad scheme" and "prefixing produced
+    nonsense" are caught by the same two checks below.
+    """
+    scheme = urlsplit(url).scheme
+    if scheme not in ("http", "https"):
+        return False
+    if has_ip_address(url):
+        return True
+    parts = _extract(url)
+    return bool(parts.domain) and bool(parts.suffix)
 
 
 def has_ip_address(url: str) -> bool:
@@ -261,9 +540,7 @@ def brand_typosquat_distance(url: str) -> int:
 
 
 def is_exact_brand_domain(url: str) -> bool:
-    parts = _extract(url)
-    name = parts.domain.lower()
-    return name in _BRAND_DOMAINS or name in _REAL_DOMAIN_NAMES
+    return known_brand_slug(url) is not None
 
 
 def _levenshtein_ops(a: str, b: str) -> list[tuple[str, str, str]]:

@@ -3,21 +3,29 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
+from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.db.models import CheckHistory, url_hash
+from app.db.models import CheckHistory, EmailCheckHistory, PhoneCheckHistory, url_hash
 from app.db.session import get_session
 from app.features.description import generate_reason_narrative, generate_site_description
-from app.features.lexical import typosquat_target
+from app.features.lexical import (
+    brand_display_name,
+    is_checkable_web_url,
+    known_brand_slug,
+    looks_like_bare_email,
+    typosquat_target,
+)
 from app.features.popularity import popularity_rank
 from app.features.reputation import check_safe_browsing, check_virustotal
 from app.model.predict import PhishingModel
 from app.pipeline import extract_all_features
+from app.rate_limit import limiter
 from app.verdict import resolve_verdict
 
 # Override reasons that replace the model's own verdict outright -- SHAP
@@ -51,7 +59,10 @@ class CheckResponse(BaseModel):
     confidence: float
     low_confidence: bool
     missing_signals: list[str]
+    is_exact_brand_domain: bool
+    known_brand_display_name: str | None
     typosquat_target: str | None
+    typosquat_brand_display: str | None
     typosquat_real_domain: str | None
     typosquat_diff: str | None
     popularity_rank: int | None
@@ -79,15 +90,31 @@ class StatsResponse(BaseModel):
 
 
 @router.post("/api/check", response_model=CheckResponse)
-def check_url(payload: CheckRequest, session: Session = Depends(get_session)) -> CheckResponse:
+@limiter.limit(settings.check_rate_limit)
+def check_url(
+    request: Request, payload: CheckRequest, session: Session = Depends(get_session)
+) -> CheckResponse:
     url = payload.url.strip()
     if not url:
         raise HTTPException(status_code=422, detail="url must not be empty")
+    if looks_like_bare_email(url):
+        raise HTTPException(
+            status_code=422,
+            detail="This looks like an email address, not a URL -- try the Email tab instead.",
+        )
     if "://" not in url:
         url = f"https://{url}"
+    if not is_checkable_web_url(url):
+        raise HTTPException(
+            status_code=422,
+            detail="This doesn't look like a checkable web address -- only http/https URLs are supported.",
+        )
 
     typosquat_match = typosquat_target(url)
     lookalike_of = typosquat_match.brand if typosquat_match else None
+    brand_slug = known_brand_slug(url)
+    known_brand_name = brand_display_name(brand_slug) if brand_slug else None
+    typosquat_brand_display = brand_display_name(typosquat_match.brand) if typosquat_match else None
     rank = popularity_rank(url)
     # Whether a key is *configured at all*, independent of whether this
     # particular request got an answer -- always reflects current settings,
@@ -113,7 +140,10 @@ def check_url(payload: CheckRequest, session: Session = Depends(get_session)) ->
             confidence=cached_row.confidence,
             low_confidence=cached_row.low_confidence,
             missing_signals=[s for s in cached_row.missing_signals.split(",") if s],
+            is_exact_brand_domain=brand_slug is not None,
+            known_brand_display_name=known_brand_name,
             typosquat_target=lookalike_of,
+            typosquat_brand_display=typosquat_brand_display,
             typosquat_real_domain=typosquat_match.real_domain if typosquat_match else None,
             typosquat_diff=typosquat_match.diff_description if typosquat_match else None,
             popularity_rank=rank,
@@ -246,7 +276,10 @@ def check_url(payload: CheckRequest, session: Session = Depends(get_session)) ->
         confidence=resolved.confidence,
         low_confidence=resolved.low_confidence,
         missing_signals=missing_signals,
+        is_exact_brand_domain=brand_slug is not None,
+        known_brand_display_name=known_brand_name,
         typosquat_target=lookalike_of,
+        typosquat_brand_display=typosquat_brand_display,
         typosquat_real_domain=typosquat_match.real_domain if typosquat_match else None,
         typosquat_diff=typosquat_match.diff_description if typosquat_match else None,
         popularity_rank=rank,
@@ -269,12 +302,23 @@ def check_url(payload: CheckRequest, session: Session = Depends(get_session)) ->
     )
 
 
+_STATS_TABLES = {
+    "url": CheckHistory,
+    "email": EmailCheckHistory,
+    "phone": PhoneCheckHistory,
+}
+
+
 @router.get("/api/stats", response_model=StatsResponse)
-def stats(session: Session = Depends(get_session)) -> StatsResponse:
+@limiter.limit(settings.stats_rate_limit)
+def stats(
+    request: Request,
+    type: Literal["url", "email", "phone"] = "url",
+    session: Session = Depends(get_session),
+) -> StatsResponse:
+    table = _STATS_TABLES[type]
     counts = dict(
-        session.execute(
-            select(CheckHistory.verdict, func.count()).group_by(CheckHistory.verdict)
-        ).all()
+        session.execute(select(table.verdict, func.count()).group_by(table.verdict)).all()
     )
     return StatsResponse(
         safe_count=counts.get("safe", 0),

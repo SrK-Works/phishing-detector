@@ -1,4 +1,5 @@
 from app.features.lexical import (
+    brand_display_name,
     brand_typosquat_distance,
     digit_ratio_in_domain,
     domain_entropy,
@@ -7,7 +8,11 @@ from app.features.lexical import (
     has_double_slash_redirect,
     has_ip_address,
     has_suspicious_tld,
+    is_checkable_web_url,
     is_exact_brand_domain,
+    known_brand_slug,
+    looks_like_bare_email,
+    looks_like_url,
     registered_domain,
     subdomain_count,
     typosquat_target,
@@ -166,3 +171,91 @@ def test_extract_lexical_features_returns_all_fields():
     assert d["has_at_symbol"] is True
     assert d["has_suspicious_tld"] is True
     assert isinstance(d["url_length"], int)
+
+
+def test_typosquat_target_flags_recruitment_scam_lookalike():
+    # The exact gap that motivated adding IT/consulting employers to the
+    # brand list: a "z" -> "g" swap impersonating Cognizant in a fake
+    # recruitment email domain.
+    match = typosquat_target("https://cognigant.com")
+    assert match is not None
+    assert match.brand == "cognizant"
+    assert match.real_domain == "cognizant.com"
+    assert 'swapped for "z"' in match.diff_description
+
+
+def test_known_brand_slug_matches_real_domain():
+    assert known_brand_slug("https://cognizant.com") == "cognizant"
+    assert known_brand_slug("https://hdfcbank.com") == "hdfc"
+    assert known_brand_slug("https://some-unrelated-site.com") is None
+
+
+def test_brand_display_name_falls_back_to_title_case():
+    assert brand_display_name("cognizant") == "Cognizant"
+    assert brand_display_name("hdfc") == "HDFC Bank"
+    assert brand_display_name("some-unlisted-slug") == "Some Unlisted Slug"
+
+
+def test_looks_like_bare_email_flags_plain_addresses():
+    # The exact live case: "noreply@email.openai.com" pasted into the URL
+    # checker silently became "https://noreply@email.openai.com" (userinfo
+    # "noreply", host "email.openai.com") -- a real but confusing result.
+    assert looks_like_bare_email("noreply@email.openai.com") is True
+    assert looks_like_bare_email("support@openai.com") is True
+    assert looks_like_bare_email("  support@openai.com  ") is True
+
+
+def test_looks_like_bare_email_does_not_flag_urls_with_userinfo():
+    # A deliberately-constructed URL with credentials, or a path segment
+    # that happens to contain "@", must never be misclassified -- both
+    # contain "://" or "/", which a bare email address never does.
+    assert looks_like_bare_email("https://user@host.com") is False
+    assert looks_like_bare_email("example.com/page@2x.jpg") is False
+    assert looks_like_bare_email("example.com") is False
+
+
+def test_looks_like_url_flags_urls():
+    assert looks_like_url("https://example.com") is True
+    assert looks_like_url("example.com/login") is True
+    assert looks_like_url("http://example.com/login?token=abc") is True
+
+
+def test_looks_like_url_does_not_flag_bare_domain_or_email():
+    assert looks_like_url("example.com") is False
+    assert looks_like_url("support@example.com") is False
+
+
+def test_is_checkable_web_url_accepts_normal_urls():
+    assert is_checkable_web_url("https://google.com") is True
+    assert is_checkable_web_url("http://example.com/path?q=1") is True
+    assert is_checkable_web_url("https://user:pass@example.com") is True
+
+
+def test_is_checkable_web_url_accepts_ip_literals():
+    # IP-literal URLs are still checkable -- has_ip_address is itself a
+    # model feature (a real phishing signal), not something to reject.
+    assert is_checkable_web_url("http://8.8.8.8") is True
+    assert is_checkable_web_url("http://192.168.1.1") is True
+
+
+def test_is_checkable_web_url_rejects_non_http_schemes():
+    # Live-caught: "ftp://example.com" previously sailed through and
+    # returned a confident-looking "safe" verdict for a protocol this app
+    # has no way to meaningfully assess.
+    assert is_checkable_web_url("ftp://example.com/file.txt") is False
+    assert is_checkable_web_url("file:///etc/passwd") is False
+
+
+def test_is_checkable_web_url_rejects_pseudo_url_after_prefixing():
+    # Live-caught: "javascript:alert(1)" has no "://", so the caller's own
+    # "prepend https://" step turns it into "https://javascript:alert(1)"
+    # -- which parses without ever being a real address, and previously
+    # returned a fabricated "83% confident safe" verdict instead of being
+    # rejected outright.
+    assert is_checkable_web_url("https://javascript:alert(1)") is False
+    assert is_checkable_web_url("https://data:text/html,<script>alert(1)</script>") is False
+
+
+def test_is_checkable_web_url_rejects_hostless_or_suffixless_hosts():
+    assert is_checkable_web_url("http://localhost") is False
+    assert is_checkable_web_url("http://intranet") is False
