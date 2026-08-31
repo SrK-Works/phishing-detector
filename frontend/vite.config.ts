@@ -15,5 +15,9 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/setupTests.ts'],
+    // Vitest's default 'threads' pool has been unreliable spawning jsdom
+    // workers on GitHub Actions' Linux runners (worker init crash) even
+    // though it's fine locally -- 'forks' is the documented workaround.
+    pool: 'forks',
   },
 })
