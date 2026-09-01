@@ -225,10 +225,11 @@ exercise. High coverage numbers can still hide bad tests (you can call a
 function without checking its output means anything), so it's a useful
 signal, never proof of correctness on its own.
 - *In this project*: we have strong coverage on the pure logic
-  (`lexical.py`, `verdict.py`) and the reputation/description integrations
-  (all mocked), but essentially **zero automated coverage on the React
-  frontend** — every UI check so far has been manual. That's a real,
-  nameable gap, not a hidden one.
+  (`lexical.py`, `verdict.py`), the reputation/description integrations
+  (all mocked), and — since Vitest + React Testing Library were added —
+  key frontend behavior (`frontend/src/lib/api.test.ts`,
+  `UrlChecker.test.tsx`, `shared.test.tsx`). Still no automated *E2E*
+  coverage though (§1/§6) — that's the real remaining gap.
 
 ---
 
@@ -236,14 +237,17 @@ signal, never proof of correctness on its own.
 
 Being asked "what would you improve about this test suite?" is common —
 here's the real, unpadded answer for this project:
-- No automated frontend tests (no Vitest/RTL component tests, no
-  Playwright/Cypress E2E) — every UI verification has been manual.
-- No CI pipeline (tests only run when I manually invoke `pytest` locally)
-  — nothing stops a broken commit from being made, only from being
-  *shipped* if someone remembers to run tests first.
+- No automated E2E suite (no Playwright/Cypress driving the actual
+  browser) — Vitest + React Testing Library now covers component-level
+  frontend behavior (see `.github/workflows/ci.yml`), but nothing drives
+  the real rendered app end-to-end yet.
 - `test_api_smoke.py` makes real network calls and is explicitly marked
   "slow/flaky-tolerant by design" — a more mature suite would isolate that
   behind a marker (e.g. `@pytest.mark.network`) so CI could skip it by
   default and only run it on demand.
 - No dedicated integration test for `app/pipeline.py` itself (only
   covered indirectly through the system-level smoke test).
+
+(Resolved since this doc was first written: CI now runs on every push —
+backend pytest + frontend Vitest/RTL, see `.github/workflows/ci.yml` — and
+the training dataset grew from 600 to 6,000 rows, see `docs/DATASET.md`.)

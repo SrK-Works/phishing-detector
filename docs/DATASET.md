@@ -6,15 +6,21 @@
   research-standard replacement for Alexa rank, which shut down in 2022),
   sampled from the top 50k, plus every domain used in
   `app/features/lexical.py`'s brand/typosquat list (see below for why).
-- **Phishing**: [PhishTank](https://phishtank.org)'s verified feed and
-  [OpenPhish](https://openphish.com)'s public feed. Both are free but small:
-  PhishTank rate-limits unauthenticated bulk downloads (~75 requests / 3
-  days), and OpenPhish's free feed caps out around 300 live URLs at any
-  given time. A production build would register for PhishTank API access
-  and/or pay for OpenPhish's full feed to get real volume.
+- **Phishing**: [Phishing.Database](https://github.com/mitchellkrogza/Phishing.Database),
+  an hourly-updated GitHub-hosted aggregator that merges OpenPhish, PhishTank,
+  and several other feeds into one plain-text list, served off
+  `raw.githubusercontent.com` -- no API key, no account, no per-caller rate
+  limit. This replaced hitting PhishTank/OpenPhish directly: PhishTank's
+  keyless endpoint now hard rate-limits ("exceeded the request rate limit"),
+  and OpenPhish's free feed has been throttled down to single digits of URLs
+  at a time -- neither can carry a dataset build on its own anymore.
+  OpenPhish is still tried as a secondary, best-effort top-up.
 
-Current snapshot: 600 rows, balanced 300/300, rebuilt 2026-08-08 (three
-times the same day -- see bugs #5-#7 below).
+Current snapshot: 6,000 rows, balanced 3,000/3,000, rebuilt 2026-09-01. The
+dataset is a committed file (`app/data/dataset.parquet`) precisely so
+training and deployment never depend on any of these feeds being up --
+see `backend/README.md`'s "Refresh the dataset" section for how to pull a
+newer one by hand later.
 
 ## Feature extraction
 
@@ -158,26 +164,25 @@ outside the synthetic dataset.
   no signal about what a *specific* domain's real deep links look like.
   Fixing this properly means sampling real deep links per domain, not
   synthetic ones.
-- **Small dataset makes rare combinations unreliable.** A domain that is
-  both decades-old *and* one edit away from a known brand (e.g. an old,
-  opportunistically-registered `paypa1.com`) is a combination the 600-row
+- **Rare combinations are still unreliable even at 6,000 rows.** A domain
+  that is both decades-old *and* one edit away from a known brand (e.g. an
+  old, opportunistically-registered `paypa1.com`) is a combination the
   dataset has few or no examples of, so the model's own probability for
-  cases like this can't be trusted -- it scored one such domain 95.7%
-  legit. The independent, rule-based `typosquat_target` check (not part of
-  the ML model at all) still flags it correctly regardless of what the
-  model's confidence says, which is why that check exists as a separate
-  signal rather than only as a model feature. Scaling up training data
-  volume is the real fix.
+  cases like this can't be fully trusted. The independent, rule-based
+  `typosquat_target` check (not part of the ML model at all) still flags it
+  correctly regardless of what the model's confidence says, which is why
+  that check exists as a separate signal rather than only as a model
+  feature.
 - **Shortened URLs are only as good as the redirect chain we can follow.**
   `bit.ly` itself is a legitimate, decades-old domain, so a shortener link
   that doesn't actually resolve to anything won't get flagged just for
   being a shortener -- the model (correctly) needs the destination content
   to judge the destination, not the shortener's own reputation.
-- **Dataset is small (600 rows).** Solid enough to validate the pipeline
-  end-to-end and catch the bugs above, but not enough for a defensible
-  accuracy claim. Scaling up needs either paid feed access or accumulating
-  daily snapshots over time. `app/model/train.py`'s cross-validated model
-  selection (see ARCHITECTURE.md's "Data & training" section) exists
-  specifically because a single train/test split on this little data is
-  too noisy to trust on its own -- CV doesn't fix a small dataset, it just
-  stops the model-selection step from lying about how sure it is.
+- **6,000 rows is enough to be credible, not enough to be exhaustive.**
+  Real-world phishing patterns shift over time and this is one snapshot;
+  the honest fix for long-term accuracy is periodically refreshing the
+  dataset (`backend/README.md`), not just growing this one snapshot further.
+  `app/model/train.py`'s cross-validated model selection (see
+  ARCHITECTURE.md's "Data & training" section) still matters at this size --
+  it stops the model-selection step from overstating how sure it is about
+  any one candidate.

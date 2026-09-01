@@ -11,9 +11,14 @@ venv/
 backend/phishing.db
 backend/app/model/artifacts/*.joblib
 backend/app/model/artifacts/*.json
-backend/app/data/*.parquet
 backend/app/data/tranco.csv
 backend/app/data/*.zip
+
+# dataset.parquet itself IS committed (see below) as the frozen,
+# network-free source of truth for training -- only dated snapshots and
+# other generated parquet files stay ignored.
+backend/app/data/*.parquet
+!backend/app/data/dataset.parquet
 
 # Node / frontend
 frontend/node_modules/

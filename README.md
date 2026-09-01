@@ -8,8 +8,9 @@ This is a from-scratch modern rebuild of a 2022 B.Tech final-year project. The
 original used a 2018 static dataset and several since-dead data sources (Alexa
 rank, unauthenticated Google search scraping). This rewrite:
 
-- Pulls fresh phishing URLs from PhishTank/OpenPhish and legit/popular domains
-  from the Tranco list, instead of a frozen CSV.
+- Trains on a real, current dataset (Tranco for legit domains, a live
+  phishing-feed aggregator for phishing URLs) instead of a frozen 2018 CSV --
+  see `docs/DATASET.md`.
 - Splits URL features into instant lexical checks (no network) and slower
   host/content checks (WHOIS, DNS, TLS, page content), with a bounded time
   budget per request.
@@ -19,10 +20,10 @@ rank, unauthenticated Google search scraping). This rewrite:
   network addresses on the server's behalf).
 
 Status: functional and hardened for public use (rate limiting, SSRF guards,
-retention/purge of stored history). Known gaps: no CI pipeline, no automated
-frontend tests, and a small (600-row) training dataset — see
-`docs/TESTING.md` for the full honest list. See `docs/ARCHITECTURE.md` and
-`docs/DATASET.md` for design details.
+retention/purge of stored history), CI on every push (backend + frontend
+tests), and a 6,000-row training dataset. See `docs/TESTING.md` for the
+honest remaining gaps (e.g. no automated E2E/Playwright suite) and
+`docs/ARCHITECTURE.md` / `docs/DATASET.md` for design details.
 
 ## Layout
 

@@ -1,11 +1,27 @@
 """Builds a fresh labeled training dataset, replacing the old project's
 frozen 2018 UCI CSV.
 
-Sources (all free, no API key required as of writing):
+Sources:
 - Legit / negative examples: Tranco's daily top-1M domain list
-  (https://tranco-list.eu), the maintained successor to Alexa rank.
-- Phishing / positive examples: PhishTank's verified feed and OpenPhish's
-  public feed.
+  (https://tranco-list.eu), the maintained successor to Alexa rank. Free,
+  no key required.
+- Phishing / positive examples: mitchellkrogza/Phishing.Database on GitHub
+  (https://github.com/mitchellkrogza/Phishing.Database), an aggregator that
+  merges OpenPhish, PhishTank and several other feeds and is updated
+  hourly by a bot. Served as a plain text file off raw.githubusercontent.com
+  -- no API key, no account, no per-caller rate limit (it's a static file
+  behind GitHub's CDN, not a live API). This replaced directly hitting
+  PhishTank/OpenPhish: PhishTank's keyless endpoint now hard rate-limits
+  ("exceeded the request rate limit"), and OpenPhish's free feed has been
+  throttled down to single digits of URLs -- neither can carry a dataset
+  build on its own anymore. OpenPhish is kept as a secondary, best-effort
+  top-up source since it costs nothing to also try.
+
+This build is meant to be run once (or occasionally, by hand) to produce
+a committed app/data/dataset.parquet -- the model is trained and shipped
+against that static file, so normal training/CI never touches the network.
+Re-run this script manually later only if you want to refresh the dataset
+with newer threat data.
 
 These feed URLs are hardcoded constants controlled by us, not user input,
 so they're fetched with a plain `requests` session -- app.security.safe_get
@@ -39,7 +55,10 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 logger = logging.getLogger(__name__)
 
 TRANCO_URL = "https://tranco-list.eu/top-1m.csv.zip"
-PHISHTANK_URL = "http://data.phishtank.com/data/online-valid.csv"
+PHISHING_DATABASE_URL = (
+    "https://raw.githubusercontent.com/mitchellkrogza/Phishing.Database"
+    "/master/phishing-links-ACTIVE.txt"
+)
 OPENPHISH_URL = "https://openphish.com/feed.txt"
 
 _HTTP_TIMEOUT = 30
@@ -87,15 +106,14 @@ def fetch_tranco_domains(sample_size: int, pool_size: int = 50_000) -> list[str]
     return [f"https://{'www.' + d if random.random() < 0.5 else d}" for d in sample]
 
 
-def fetch_phishtank_urls(sample_size: int) -> list[str]:
-    logger.info("Downloading PhishTank feed...")
+def fetch_phishing_database_urls(sample_size: int) -> list[str]:
+    logger.info("Downloading Phishing.Database active-links feed...")
     try:
-        resp = requests.get(PHISHTANK_URL, timeout=_HTTP_TIMEOUT)
+        resp = requests.get(PHISHING_DATABASE_URL, timeout=_HTTP_TIMEOUT)
         resp.raise_for_status()
-        reader = csv.DictReader(io.StringIO(resp.text))
-        urls = [row["url"] for row in reader if row.get("url")]
+        urls = [line.strip() for line in resp.text.splitlines() if line.strip()]
     except Exception as exc:
-        logger.warning("PhishTank fetch failed (%s); continuing without it", exc)
+        logger.warning("Phishing.Database fetch failed (%s); continuing without it", exc)
         urls = []
     return random.sample(urls, min(sample_size, len(urls))) if urls else []
 
@@ -156,7 +174,7 @@ def build_dataset(
     legit_urls = brand_urls + fetch_tranco_domains(max(0, legit_count - len(brand_urls)))
     legit_urls = [_with_random_path(u) for u in legit_urls]
 
-    phish_urls = fetch_phishtank_urls(phish_count // 2)
+    phish_urls = fetch_phishing_database_urls(phish_count)
     phish_urls += fetch_openphish_urls(phish_count - len(phish_urls))
     if not phish_urls:
         raise RuntimeError("Both phishing feeds failed -- cannot build a labeled dataset")
@@ -166,6 +184,17 @@ def build_dataset(
         "Extracting features for %d URLs (%d legit / %d phishing) at concurrency=%d",
         len(tasks), len(legit_urls), len(phish_urls), concurrency,
     )
+
+    # Each row costs a handful of live network checks (DNS/TLS/host), so a
+    # full run over thousands of URLs can take tens of minutes -- long
+    # enough to realistically get interrupted (killed process, lost
+    # connection, closed laptop lid). Without a checkpoint, an interruption
+    # at 90% done throws away the whole run. Writing out_path every
+    # CHECKPOINT_EVERY rows means a resume only has to redo the tail end:
+    # rerun with the same feeds and it'll just overwrite this file again,
+    # but you at least have *a* usable dataset at every checkpoint.
+    CHECKPOINT_EVERY = 250
+    out_path.parent.mkdir(parents=True, exist_ok=True)
 
     rows = []
     with ThreadPoolExecutor(max_workers=concurrency) as pool:
@@ -178,9 +207,11 @@ def build_dataset(
                 logger.warning("Skipping %s: %s", url, exc)
             if i % 100 == 0:
                 logger.info("Processed %d/%d", i, len(tasks))
+            if i % CHECKPOINT_EVERY == 0:
+                pd.DataFrame(rows).to_parquet(out_path, index=False)
+                logger.info("Checkpoint: wrote %d rows so far to %s", len(rows), out_path)
 
     df = pd.DataFrame(rows)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
     df.to_parquet(out_path, index=False)
 
     stamped = out_path.with_name(

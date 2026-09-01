@@ -21,9 +21,11 @@ RUN pip install --no-cache-dir .
 # Pre-built React app, served by FastAPI's StaticFiles mount (see app/main.py).
 COPY --from=frontend-build /frontend/dist ./static_frontend
 
-# Model artifact + Tranco snapshot are built separately (see backend/README.md)
-# and expected to be baked in or mounted at deploy time, not generated here.
-COPY backend/app/model/artifacts ./app/model/artifacts
+# app/data/dataset.parquet is committed (see .gitignore) specifically so this
+# step never touches the network or an external feed at build/deploy time --
+# training is fast (CPU-only, a few minutes) and fully reproducible from that
+# one file. See backend/README.md if you want to refresh the dataset itself.
+RUN python -m app.model.train --dataset app/data/dataset.parquet
 
 EXPOSE 8000
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
