@@ -242,16 +242,20 @@ signal, never proof of correctness on its own.
 ## 6. Honest gaps in this project's test strategy (good interview material)
 
 Being asked "what would you improve about this test suite?" is common —
-here's the real, unpadded answer for this project:
-- `test_api_smoke.py` makes real network calls and is explicitly marked
-  "slow/flaky-tolerant by design" — a more mature suite would isolate that
-  behind a marker (e.g. `@pytest.mark.network`) so CI could skip it by
-  default and only run it on demand.
-- No dedicated integration test for `app/pipeline.py` itself (only
-  covered indirectly through the system-level smoke test).
+here's the real, unpadded answer for this project (see the "Resolved"
+note below for what's since been fixed):
 
 (Resolved since this doc was first written: CI now runs on every push —
-backend pytest + frontend Vitest/RTL + a Playwright E2E job, see
-`.github/workflows/ci.yml` — the training dataset grew from 600 to 6,000
-rows, see `docs/DATASET.md` — and there's now an automated E2E suite,
-`frontend/e2e/app.spec.ts`.)
+backend pytest + frontend Vitest/RTL + a Playwright E2E job + a `docker`
+build/smoke job, see `.github/workflows/ci.yml` — the training dataset
+grew from 600 to 6,000 rows, see `docs/DATASET.md` — there's now an
+automated E2E suite, `frontend/e2e/app.spec.ts` — the two network-calling
+tests in `test_api_smoke.py` are now tagged `@pytest.mark.network` and
+excluded from the default `pytest` run via `addopts` in `pyproject.toml`,
+so a normal `pytest -q` isn't flaky/rate-limited on google.com or
+VirusTotal, while `pytest -m network` still runs them on demand — and
+`tests/test_pipeline.py` now covers `app/pipeline.extract_all_features`
+directly: both host+content succeeding, host timing out without starving
+content of its share of the shared deadline, content raising without
+blocking host, and the "host resolved but WHOIS itself came back empty"
+case that `whois_missing` exists to distinguish.)

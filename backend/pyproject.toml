@@ -35,6 +35,10 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "network: makes real outbound network calls (google.com, VirusTotal, Safe Browsing) -- excluded by default (see addopts) so CI/local runs aren't flaky/rate-limited on external services; run explicitly with `pytest -m network`.",
+]
+addopts = "-m 'not network'"
 
 [build-system]
 requires = ["setuptools>=68"]

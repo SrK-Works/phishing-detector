@@ -1,7 +1,11 @@
-"""End-to-end smoke test: exercises the real /api/check pipeline (lexical
-+ best-effort host/content extraction) against a couple of stable public
-URLs. This intentionally makes real network calls -- it is not a unit test
-and is slow/flaky-tolerant by design (network features fail soft already).
+"""End-to-end smoke test: exercises the real /api/check and /api/check-email
+pipelines (lexical + best-effort host/content extraction) against a real
+model artifact. Most tests here are pure validation/routing checks with no
+network involved; the two tagged @pytest.mark.network intentionally make
+real outbound calls (google.com, VirusTotal, Safe Browsing) and are
+excluded from the default `pytest` run (see pyproject.toml's addopts) so
+CI/local runs aren't flaky or rate-limited on external services -- run them
+explicitly with `pytest -m network`.
 """
 
 import phonenumbers
@@ -23,6 +27,7 @@ def client():
         yield c
 
 
+@pytest.mark.network
 def test_check_known_legit_domain(client):
     resp = client.post("/api/check", json={"url": "https://www.google.com"})
     assert resp.status_code == 200
@@ -82,6 +87,7 @@ def test_stats_endpoint_accepts_type_param(client):
         assert "phishing_count" in body
 
 
+@pytest.mark.network
 def test_check_email_known_brand_domain(client):
     resp = client.post("/api/check-email", json={"email": "support@paypal.com"})
     assert resp.status_code == 200
