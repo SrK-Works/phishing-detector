@@ -1,0 +1,31 @@
+# Build context is the repo root (docker-compose.yml: context: .) -- without
+# this file, `docker build` sends backend/.venv and frontend/node_modules
+# (gigabytes) to the daemon before the build even starts.
+
+.git/
+.github/
+
+backend/.venv/
+venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+backend/phishing.db
+backend/app/model/artifacts/
+backend/static_frontend/
+
+frontend/node_modules/
+frontend/dist/
+frontend/playwright-report/
+frontend/test-results/
+
+.env
+.env.*
+!.env.example
+
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
