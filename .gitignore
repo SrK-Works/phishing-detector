@@ -13,6 +13,7 @@ backend/app/model/artifacts/*.joblib
 backend/app/model/artifacts/*.json
 backend/app/data/tranco.csv
 backend/app/data/*.zip
+backend/static_frontend/
 
 # dataset.parquet itself IS committed (see below) as the frozen,
 # network-free source of truth for training -- only dated snapshots and
@@ -23,6 +24,8 @@ backend/app/data/*.parquet
 # Node / frontend
 frontend/node_modules/
 frontend/dist/
+frontend/playwright-report/
+frontend/test-results/
 
 # Env / secrets
 .env

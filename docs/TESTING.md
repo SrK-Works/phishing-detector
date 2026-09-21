@@ -36,11 +36,18 @@ real caller would use it (HTTP in, JSON out), including the database.
 
 **End-to-end (E2E) testing** — testing the entire real user journey,
 usually through the actual UI, sometimes across real external systems too.
-- *In this project*: this is what I've been doing manually with the
-  Chrome browser tool — typing a URL into the actual React app, clicking
-  Check, and confirming the rendered page looks right. We have zero
-  *automated* E2E tests right now (no Playwright/Cypress suite driving the
-  frontend) — another real, worth-naming gap.
+- *In this project*: `frontend/e2e/app.spec.ts` (Playwright) now automates
+  this — it builds the real frontend, serves it from the real FastAPI
+  backend (the same `static_frontend` mount `backend/Dockerfile` uses in
+  production, not a dev proxy standing in for it), and drives an actual
+  Chromium browser through it: typing a URL in, clicking Check, and
+  asserting on the rendered verdict and explanation. Runs as its own `e2e`
+  job in `.github/workflows/ci.yml`, with the trained model cached between
+  runs (training from `dataset.parquet` takes a couple of minutes) so it
+  doesn't retrain from scratch on every push. Before this, the only E2E
+  testing was manual — me typing into the Chrome browser tool and eyeballing
+  the result — which is still worth doing for exploratory cases, but wasn't
+  repeatable in CI.
 
 ---
 
@@ -226,10 +233,9 @@ function without checking its output means anything), so it's a useful
 signal, never proof of correctness on its own.
 - *In this project*: we have strong coverage on the pure logic
   (`lexical.py`, `verdict.py`), the reputation/description integrations
-  (all mocked), and — since Vitest + React Testing Library were added —
-  key frontend behavior (`frontend/src/lib/api.test.ts`,
-  `UrlChecker.test.tsx`, `shared.test.tsx`). Still no automated *E2E*
-  coverage though (§1/§6) — that's the real remaining gap.
+  (all mocked), key frontend behavior (`frontend/src/lib/api.test.ts`,
+  `UrlChecker.test.tsx`, `shared.test.tsx`), and now a real, automated E2E
+  layer (`frontend/e2e/app.spec.ts`, see §1) on top.
 
 ---
 
@@ -237,10 +243,6 @@ signal, never proof of correctness on its own.
 
 Being asked "what would you improve about this test suite?" is common —
 here's the real, unpadded answer for this project:
-- No automated E2E suite (no Playwright/Cypress driving the actual
-  browser) — Vitest + React Testing Library now covers component-level
-  frontend behavior (see `.github/workflows/ci.yml`), but nothing drives
-  the real rendered app end-to-end yet.
 - `test_api_smoke.py` makes real network calls and is explicitly marked
   "slow/flaky-tolerant by design" — a more mature suite would isolate that
   behind a marker (e.g. `@pytest.mark.network`) so CI could skip it by
@@ -249,5 +251,7 @@ here's the real, unpadded answer for this project:
   covered indirectly through the system-level smoke test).
 
 (Resolved since this doc was first written: CI now runs on every push —
-backend pytest + frontend Vitest/RTL, see `.github/workflows/ci.yml` — and
-the training dataset grew from 600 to 6,000 rows, see `docs/DATASET.md`.)
+backend pytest + frontend Vitest/RTL + a Playwright E2E job, see
+`.github/workflows/ci.yml` — the training dataset grew from 600 to 6,000
+rows, see `docs/DATASET.md` — and there's now an automated E2E suite,
+`frontend/e2e/app.spec.ts`.)
