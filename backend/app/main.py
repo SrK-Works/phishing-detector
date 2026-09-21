@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -11,15 +12,37 @@ from slowapi.middleware import SlowAPIMiddleware
 from app.api.email_routes import router as email_router
 from app.api.phone_routes import router as phone_router
 from app.api.routes import router
+from app.config import settings
 from app.db.retention import purge_expired_history
 from app.db.session import init_db
+from app.features.popularity import refresh_cache
 from app.rate_limit import limiter, rate_limit_exceeded_handler
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
     purge_expired_history()
+    # tranco.csv is gitignored (a live download, not committed source -- see
+    # app/features/popularity.py) and the Docker image doesn't bake it in at
+    # build time either, to keep the build itself offline/reproducible like
+    # the training dataset. So a genuinely fresh deploy (a new clone, a fresh
+    # container) has no popularity data until this fetches it once here.
+    # Failing soft matches every other optional signal in this app (Safe
+    # Browsing, VirusTotal, Gemini) -- no network at startup just means the
+    # popularity-based verdict override stays unavailable, not a crash.
+    if not settings.tranco_list_path.exists():
+        try:
+            refresh_cache()
+        except Exception as exc:
+            logger.warning(
+                "Could not fetch the Tranco popularity list at startup (%s) -- "
+                "the popularity-based verdict override will be unavailable "
+                "until `python -m app.features.popularity` succeeds.",
+                type(exc).__name__,
+            )
     yield
 
 

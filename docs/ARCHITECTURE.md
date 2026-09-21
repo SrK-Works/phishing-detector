@@ -180,10 +180,23 @@ FastAPI's `StaticFiles` mount (`app/main.py`) alongside the API — one
 process, one deploy target, no CORS to configure. Built from the repo root:
 `docker compose up --build`.
 
-Two data files are required at runtime but not committed to the repo (see
-`.gitignore`) — they need to exist in the image/volume before first request:
-`app/model/artifacts/model.joblib` (`python -m app.model.train`) and
-`app/data/tranco.csv` (`python -m app.features.popularity`). Both are plain
-downloads/builds, not secrets, so they can be baked into the image at build
-time. `PHISH_SAFE_BROWSING_API_KEY` *is* a secret if set — pass it as a
-runtime environment variable, never bake it into the image.
+Two data files are needed but not committed to the repo (see `.gitignore`),
+and the two are handled differently:
+- `app/model/artifacts/model.joblib` **is** baked into the image —
+  `backend/Dockerfile` runs `python -m app.model.train` at build time,
+  trained from the committed `dataset.parquet`, so no network call happens
+  during the build.
+- `app/data/tranco.csv` (the Tranco top-1M list backing the
+  popularity-override signal) is **not** baked in, specifically so the
+  build stays offline/reproducible the same way the model training does.
+  Instead, `app/main.py`'s lifespan fetches it once at startup if missing
+  (`app/features/popularity.refresh_cache`) and fails soft on error, same
+  as every other optional signal (Safe Browsing/VirusTotal/Gemini) — a
+  fresh container just makes one ~10s network call on first boot rather
+  than needing a manual step, and the popularity override is simply
+  unavailable until that succeeds.
+
+`PHISH_SAFE_BROWSING_API_KEY` (and the other optional API keys) *are*
+secrets if set — pass them as runtime environment variables (an untracked
+`.env` at the repo root works with `docker-compose.yml`), never bake them
+into the image.
