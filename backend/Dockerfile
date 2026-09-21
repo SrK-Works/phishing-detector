@@ -1,5 +1,8 @@
 # --- frontend build stage ---
-FROM node:20-slim AS frontend-build
+# Matches the Node version CI/local dev actually test against (see
+# .github/workflows/ci.yml) -- kept in sync deliberately, not left to whatever
+# a floating "-slim" tag happens to resolve to.
+FROM node:24-slim AS frontend-build
 WORKDIR /frontend
 COPY frontend/package*.json ./
 RUN npm ci
@@ -26,6 +29,15 @@ COPY --from=frontend-build /frontend/dist ./static_frontend
 # training is fast (CPU-only, a few minutes) and fully reproducible from that
 # one file. See backend/README.md if you want to refresh the dataset itself.
 RUN python -m app.model.train --dataset app/data/dataset.parquet
+
+# Drop root before serving requests. /data is the SQLite volume mount point
+# (see docker-compose.yml) -- pre-creating and chowning it here means the
+# named volume inherits appuser ownership on first creation, since Docker
+# copies a mount point's existing content/ownership into a fresh volume.
+RUN useradd --create-home --uid 1000 appuser \
+    && mkdir -p /data \
+    && chown -R appuser:appuser /app /data
+USER appuser
 
 EXPOSE 8000
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
